@@ -18,6 +18,7 @@ import { GroupsPage } from './pages/Groups'
 import { HomePage } from './pages/Home'
 import { HouseholdFormPage } from './pages/HouseholdForm'
 import { HouseholdPage } from './pages/Household'
+import { ImportContactsPage } from './pages/ImportContacts'
 import { LoginPage } from './pages/Login'
 import { OnboardingPage } from './pages/Onboarding'
 import { ProfilePage } from './pages/Profile'
@@ -72,6 +73,7 @@ export function App() {
         <Route path="/activity" element={<ActivityPage />} />
         <Route path="/me" element={<ProfilePage />} />
         <Route path="/friends/new" element={<AddFriendPage />} />
+        <Route path="/friends/import" element={<ImportContactsPage />} />
         <Route path="/p/:id" element={<FriendPage />} />
         <Route path="/h/:id" element={<HouseholdPage />} />
         <Route path="/pairs/new" element={<HouseholdFormPage />} />

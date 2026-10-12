@@ -10,16 +10,6 @@ import { normalizePhone } from '../lib/phone'
 import { useT } from '../lib/i18n'
 import { inviteText, whatsappLink } from '../lib/share'
 
-interface PickedContact {
-  name?: string[]
-  tel?: string[]
-}
-
-interface ContactsManager {
-  select(props: string[], options: { multiple: boolean }): Promise<PickedContact[]>
-}
-
-const contactsApi = (navigator as Navigator & { contacts?: ContactsManager }).contacts
 
 export function AddFriendPage() {
   const navigate = useNavigate()
@@ -50,35 +40,14 @@ export function AddFriendPage() {
     }
   }
 
-  const pickFromContacts = async () => {
-    if (!contactsApi) return
-    setError(null)
-    try {
-      const picked = await contactsApi.select(['name', 'tel'], { multiple: true })
-      const problems: string[] = []
-      for (const c of picked) {
-        const tel = c.tel?.find((t) => normalizePhone(t)) ?? c.tel?.[0]
-        try {
-          await addOne(c.name?.[0] ?? '', tel ?? '')
-        } catch (e) {
-          problems.push(`${c.name?.[0] ?? t('Contact')}: ${friendlyError(e)}`)
-        }
-      }
-      if (problems.length) setError(problems.join('\n'))
-    } catch {
-      // The person closed the picker.
-    }
-  }
-
   const registered = (id: string) => people.byId.get(id)?.is_registered
 
   return (
     <Page title={t('Add friends')} back>
-      {contactsApi ? (
-        <Button variant="secondary" block className="mt-2" onClick={pickFromContacts}>
-          <IconContacts /> {t('Choose from phone contacts')}
-        </Button>
-      ) : null}
+      <ButtonLink to="/friends/import" block className="mt-2">
+        <IconContacts /> {t('Import from your contacts')}
+      </ButtonLink>
+      <p className="mt-2 text-center text-sm text-slate-500 dark:text-slate-400">{t('Or add one friend by hand:')}</p>
 
       <div className="mt-5 space-y-4">
         <Field label={t('Name')}>

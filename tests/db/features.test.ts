@@ -260,3 +260,28 @@ describe('push targets', () => {
     expect(digest).toContainEqual({ endpoint: 'https://push.example/a', owed_to_me: '20000', i_owe: '0' })
   })
 })
+
+describe('bulk contact import', () => {
+  it('adds many friends at once, skips me and keeps names I already chose', async () => {
+    const [a, b] = await friends('Ia', 'Ib')
+    const before = await db.as<{ nickname: string }>(a, 'select nickname from public.contacts where person_id = $1', [b.personId])
+    const [{ added }] = await db.as<{ added: number }>(a, 'select public.add_contacts($1::jsonb) as added', [
+      JSON.stringify([
+        { phone: '+919700000001', name: 'Zoya' },
+        { phone: '+919700000002', name: 'Yash' },
+        { phone: '+919700000002', name: 'Yash duplicate' },
+        { phone: b.phone, name: 'Renamed B' },
+        { phone: a.phone, name: 'Myself' },
+      ]),
+    ])
+    expect(added).toBe(2)
+    const after = await db.as<{ nickname: string }>(a, 'select nickname from public.contacts where person_id = $1', [b.personId])
+    expect(after).toEqual(before)
+    const people = await db.as<{ display_name: string }>(a, 'select display_name from public.my_people() order by display_name')
+    expect(people.map((p) => p.display_name)).toEqual(expect.arrayContaining(['Yash', 'Zoya']))
+
+    await expect(
+      db.as(a, 'select public.add_contacts($1::jsonb)', [JSON.stringify(Array.from({ length: 501 }, () => ({ phone: '+919700000003', name: 'x' })))]),
+    ).rejects.toThrow(/too_many_contacts/)
+  })
+})

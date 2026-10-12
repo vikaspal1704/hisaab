@@ -557,4 +557,31 @@ export const HINGLISH: Record<string, string> = {
   'Kitty expenses are paid by the kitty holder.': 'Kitty ka kharcha kitty rakhne wala hi deta hai.',
   'That monthly bill no longer exists.': 'Wo monthly bill ab nahi hai.',
   'Pick baari or exact.': 'Baari ya poora hisaab chuno.',
+
+  // Import contacts
+  'Import contacts': 'Contacts import karo',
+  'Import from your contacts': 'Apne contacts se import karo',
+  'Or add one friend by hand:': 'Ya ek dost khud se jodo:',
+  'No mobile numbers found in those contacts.': 'In contacts mein koi mobile number nahi mila.',
+  'That file is too big (over 10 MB).': 'File bahut badi hai (10 MB se zyada).',
+  'Couldn’t read that file. Use a .vcf or .csv contacts export.': 'File padh nahi paaye. Contacts ki .vcf ya .csv file use karo.',
+  'Added {n} friends': '{n} dost jud gaye',
+  'Select friends to add': 'Jodne ke liye dost chuno',
+  'Add {n} friends': '{n} dost jodo',
+  'Import a contacts file (.vcf or .csv)': 'Contacts file import karo (.vcf ya .csv)',
+  'Contacts file': 'Contacts file',
+  'How do I get a contacts file?': 'Contacts file kaise milegi?',
+  'Contacts app → Lists → touch and hold “All Contacts” → Export → save the .vcf to Files, then pick it here.':
+    'Contacts app → Lists → “All Contacts” ko daba ke rakho → Export → .vcf Files mein save karo, phir yahan chuno.',
+  'Contacts app → Fix & manage (or Settings) → Export to file → save the .vcf, then pick it here.':
+    'Contacts app → Fix & manage (ya Settings) → Export to file → .vcf save karo, phir yahan chuno.',
+  'contacts.google.com → Export → vCard or Google CSV.': 'contacts.google.com → Export → vCard ya Google CSV.',
+  'The file is read on your phone. Only the people you tick are saved to Hisaab. Import again any time to add new contacts — friends you already have are skipped.':
+    'File aapke phone pe hi padhi jaati hai. Sirf jinhe aap tick karoge wahi Hisaab mein save honge. Naye contacts ke liye kabhi bhi dobara import karo — purane dost chhod diye jaayenge.',
+  Clear: 'Hatao',
+  'Select all ({n})': 'Sab chuno ({n})',
+  '{n} contacts with a mobile number': 'Mobile number wale {n} contacts',
+  'Already your friend': 'Pehle se aapka dost',
+  'Showing 300 — search to find others.': '300 dikh rahe hain — baaki ke liye dhoondo.',
+  'You can import up to 500 contacts at a time.': 'Ek baar mein 500 tak contacts import kar sakte ho.',
 }

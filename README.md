@@ -25,8 +25,12 @@ tiers: **GitHub Pages** for the app and **Supabase** for the database and login.
 - **Settle up with UPI.** Opens GPay, PhonePe or Paytm with the friend's UPI ID and the
   amount filled in. The payment is only recorded after you confirm it went through. You can
   also copy the UPI ID, record cash, or send a friendly WhatsApp reminder.
-- **Friends don't need the app to start.** Add them by phone number, from your contacts on
-  Android. When they sign in with that number, they see their whole history.
+- **Friends don't need the app to start.** Add them by phone number. When they sign in with
+  that number, they see their whole history.
+- **Import your contacts.** Pick many friends at once with the phone's contact picker (Android
+  Chrome), or import a `.vcf`/`.csv` export from iPhone, Android or Google Contacts. You tick who
+  to add and they're added in one go. Importing again later only offers new people, so it
+  works as a manual sync. The file is read on the phone; only the people you tick are saved.
 - **Trustworthy books.** Entries are never silently changed. Every edit and delete is logged
   with the previous version, everyone on the entry sees it, and deletes can be undone.
 - Split equally, by exact amounts, or by shares. Several people can pay one bill. Dark mode
@@ -97,8 +101,9 @@ You need a GitHub account, a Supabase account (free) and a Google Cloud account 
    Mumbai region if your friends are in India.
 2. Open **SQL Editor** → **New query**, paste the whole contents of
    `supabase/migrations/20261012000000_init.sql`, and click **Run**. Then do the same with
-   `supabase/migrations/20261013000000_friendship_features.sql`, in that order. (If you already
-   ran the first file earlier, just run the second.)
+   `supabase/migrations/20261013000000_friendship_features.sql`, then
+   `supabase/migrations/20261014000000_bulk_contacts.sql`, in that order. If a file says
+   something "already exists", it was run before: skip it and run the next one.
 3. Open **Project Settings → API** and note the **Project URL** and the **anon / publishable
    key**. Both are meant to be public; Row Level Security protects the data.
 
@@ -205,8 +210,8 @@ tests/db/              integration tests for the SQL (balances, payments, RLS, a
   to that group, so private debts between two members stay private.
 - Logging from UPI reads text, not screenshots. GPay often shares an image, so use
   "Paste the message" with the bank SMS or the text from the payment screen.
-- The phone contact picker is Android Chrome only (a browser limitation). On iPhone, type the
-  number.
+- Web apps can't read the phone book in the background on any phone, so contacts can't sync
+  automatically. Use the contact picker (Android Chrome) or re-import a contacts file.
 - Monthly bills are posted when a member opens the app on or after the due day.
 - Anyone holding a share link can see that one passbook until you turn the link off.
 - Not done yet: receipt photos, CSV export, and multiple currencies.

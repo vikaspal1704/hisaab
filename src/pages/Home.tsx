@@ -136,7 +136,12 @@ export function HomePage() {
               icon={<IconUserPlus size={40} />}
               title={t('Add your friends')}
               body={t('Add the people you go out with. When someone pays, add it here — Hisaab keeps the running total so you can just take turns.')}
-              action={<ButtonLink to="/friends/new" block>{t('Add a friend')}</ButtonLink>}
+              action={
+                <div className="space-y-2">
+                  <ButtonLink to="/friends/import" block>{t('Import from your contacts')}</ButtonLink>
+                  <ButtonLink to="/friends/new" variant="secondary" block>{t('Add a friend')}</ButtonLink>
+                </div>
+              }
             />
           ) : null}
 

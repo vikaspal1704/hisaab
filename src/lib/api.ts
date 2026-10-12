@@ -44,6 +44,15 @@ export const api = {
     return rpc<string>('add_contact', { p_phone: phone, p_name: name })
   },
 
+  /** Adds many friends at once; returns how many were new. */
+  async addContacts(rows: { phone: string; name: string }[]): Promise<number> {
+    let added = 0
+    for (let i = 0; i < rows.length; i += 500) {
+      added += await rpc<number>('add_contacts', { p_contacts: rows.slice(i, i + 500) })
+    }
+    return added
+  },
+
   setNickname(personId: string, nickname: string) {
     return rpc<void>('set_nickname', { p_person: personId, p_nickname: nickname })
   },
