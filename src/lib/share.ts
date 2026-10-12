@@ -10,8 +10,13 @@ export function whatsappLink(phoneE164: string, text: string): string {
   return `https://wa.me/${phoneE164.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`
 }
 
-export function inviteText(friendName: string): string {
-  return `Hey ${friendName}! I’m keeping our shared expenses on Hisaab so we don’t have to split every bill. Sign in with this number to see our hisaab: ${appUrl()}`
+/** The passbook link a friend can open without an account (it's also their invite). */
+export function sharedUrl(token: string): string {
+  return `${appUrl()}#/s/${token}`
+}
+
+export function inviteText(friendName: string, link: string): string {
+  return `Hey ${friendName}! I’m keeping our shared expenses on Hisaab so we don’t have to split every bill. Here’s our hisaab so far — no app needed: ${link}\n\nTap “Join” there and sign in with this number to add your own.`
 }
 
 export function reminderText(friendName: string, amount: Paise, myUpi: string | null): string {

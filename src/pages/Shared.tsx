@@ -8,6 +8,7 @@ import { friendlyError } from '../lib/errors'
 import { formatDay } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { formatINR } from '../lib/money'
+import { rememberInvite } from '../lib/invite'
 import { appUrl } from '../lib/share'
 import type { Reaction } from '../lib/types'
 import { upiPayLink } from '../lib/upi'
@@ -104,12 +105,20 @@ export function SharedPage() {
       {react.error ? <p className="mt-2 text-sm text-red-600">{friendlyError(react.error)}</p> : null}
 
       <Card className="mt-6 p-4 text-sm">
-        <p className="font-semibold">{t('Want your own hisaab with friends?')}</p>
+        <p className="font-semibold">{v.friend_registered ? t('Already on Hisaab?') : t('Join Hisaab — free, no ads')}</p>
         <p className="mt-1 text-slate-600 dark:text-slate-300">
-          {t('Sign in with this number and everything here shows up automatically. Free, no ads.')}
+          {v.friend_registered
+            ? t('Open the app to see this and all your other hisaabs.')
+            : t('Sign in and enter the number {name} saved for you. Everything here moves into your account, and you can add expenses too.', { name: owner })}
         </p>
-        <a href={appUrl()} className="mt-3 flex min-h-11 items-center justify-center rounded-xl bg-brand-700 font-semibold text-white">
-          {t('Open Hisaab')}
+        <a
+          href={appUrl()}
+          onClick={() => {
+            if (!v.friend_registered) rememberInvite(token)
+          }}
+          className="mt-3 flex min-h-11 items-center justify-center rounded-xl bg-brand-700 font-semibold text-white"
+        >
+          {v.friend_registered ? t('Open Hisaab') : t('Join')}
         </a>
       </Card>
 

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Avatar, AvatarStack } from '../components/Avatar'
 import { IconPlus, IconX } from '../components/icons'
+import { ItemsEditor, newItem, type ExtrasDraft, type ItemDraft } from '../components/ItemsEditor'
 import { Page } from '../components/Page'
 import { CheckRow, InlineAddFriend, SearchBox } from '../components/PeoplePicker'
 import { Sheet } from '../components/Sheet'
@@ -16,6 +17,7 @@ import { useT } from '../lib/i18n'
 import { matchPayee, parsePaymentText } from '../lib/paymentText'
 import { formatINR, parseRupees, toRupeeInput, type Paise } from '../lib/money'
 import { whoPaysNext } from '../lib/settle'
+import { fromStoredItems, splitItems, toStoredItems, type BillExtras, type BillLine } from '../lib/itemSplit'
 import { buildSplit, splitByWeights, type SplitMode, type SplitUnit } from '../lib/split'
 import type { EntryDetail, Group, Household, Person, Shortcut } from '../lib/types'
 
@@ -32,7 +34,13 @@ interface FormState {
   payerAmounts: Record<string, string>
   mode: SplitMode
   values: Record<string, string>
+  /** split by item: the bill's lines and charges */
+  items: ItemDraft[]
+  extras: ExtrasDraft
 }
+
+const NO_EXTRAS_TEXT: ExtrasDraft = { tax: '', tip: '', discount: '' }
+const amountText = (paise: number) => (paise > 0 ? toRupeeInput(paise) : '')
 
 const personUnit = (id: string): SplitUnit => ({ key: id, repId: id, memberIds: [id] })
 const householdUnit = (h: Household, meId: string): SplitUnit => {
@@ -81,6 +89,23 @@ export function ExpenseFormPage() {
 function fromEntry(base: FormState, entry: EntryDetail, meId: string): FormState {
   const payers = entry.parts.filter((p) => p.paid > 0)
   const consumers = entry.parts.filter((p) => p.owed > 0 || entry.split_mode === 'shares')
+  if (entry.split_mode === 'items' && entry.items) {
+    const bill = fromStoredItems(entry.items)
+    const ids = [...new Set([...consumers.map((p) => p.person_id), ...bill.personIds])]
+    return {
+      ...base,
+      amountText: toRupeeInput(entry.amount),
+      description: entry.description,
+      groupId: entry.group_id,
+      units: ids.map(personUnit),
+      payerMode: payers.length > 1 ? 'many' : 'one',
+      payerId: payers[0]?.person_id ?? meId,
+      payerAmounts: Object.fromEntries(payers.map((p) => [p.person_id, toRupeeInput(p.paid)])),
+      mode: 'items',
+      items: bill.lines.map((l) => ({ key: l.key, name: l.name, amountText: toRupeeInput(l.amount), unitKeys: l.unitKeys })),
+      extras: { tax: amountText(bill.extras.tax), tip: amountText(bill.extras.tip), discount: amountText(bill.extras.discount) },
+    }
+  }
   return {
     ...base,
     amountText: toRupeeInput(entry.amount),
@@ -90,7 +115,8 @@ function fromEntry(base: FormState, entry: EntryDetail, meId: string): FormState
     payerMode: payers.length > 1 ? 'many' : 'one',
     payerId: payers[0]?.person_id ?? meId,
     payerAmounts: Object.fromEntries(payers.map((p) => [p.person_id, toRupeeInput(p.paid)])),
-    mode: entry.split_mode ?? 'exact',
+    // An itemised bill without its item list (e.g. paid from a kitty) edits as amounts.
+    mode: entry.split_mode === 'items' || !entry.split_mode ? 'exact' : entry.split_mode,
     values: Object.fromEntries(
       consumers.map((p) => [p.person_id, entry.split_mode === 'shares' ? String(p.shares ?? 1) : toRupeeInput(p.owed)]),
     ),
@@ -133,6 +159,8 @@ function initialState(args: {
     payerAmounts: {},
     mode: 'equal',
     values: {},
+    items: [],
+    extras: NO_EXTRAS_TEXT,
   }
 
   if (existing) return { ...fromEntry(base, existing, meId), date: existing.occurred_on }
@@ -211,7 +239,22 @@ function ExpenseForm({
     if (!existing) amountRef.current?.focus()
   }, [existing])
 
-  const amount: Paise | null = parseRupees(state.amountText)
+  const typedAmount: Paise | null = parseRupees(state.amountText)
+  const byItem = state.mode === 'items'
+
+  // Split by item: the total comes from the bill, and the typed amount is only a check.
+  const bill = useMemo(() => {
+    if (!byItem) return null
+    const lines: BillLine[] = state.items.map((i) => ({ ...i, amount: i.amountText.trim() ? (parseRupees(i.amountText) ?? 0) : 0 }))
+    const parse = (text: string) => (text.trim() ? parseRupees(text) : 0)
+    const raw = { tax: parse(state.extras.tax), tip: parse(state.extras.tip), discount: parse(state.extras.discount) }
+    const extras: BillExtras | null = raw.tax === null || raw.tip === null || raw.discount === null ? null : (raw as BillExtras)
+    const result = extras ? splitItems(state.units, lines, extras) : { ok: false as const, error: 'Check the tax, tip and discount' }
+    const subtotal = lines.reduce((s, l) => s + (l.amount > 0 ? l.amount : 0), 0)
+    return { lines, extras, result, subtotal }
+  }, [byItem, state.items, state.extras, state.units])
+  const amount: Paise | null = bill ? (bill.result.ok ? bill.result.total : null) : typedAmount
+
   const group = groups.find((g) => g.id === state.groupId) ?? null
   const kittyHolder = !existing && group?.kittyHolder ? group.kittyHolder : null
   const useKitty = Boolean(kittyHolder && fromKitty)
@@ -234,7 +277,12 @@ function ExpenseForm({
   }, [state.payerMode, state.payerId, state.payerAmounts, amount, payerCandidates, useKitty, kittyHolder])
 
   const split = useMemo(() => {
+    if (bill) {
+      if (!bill.result.ok) return bill.result
+      return buildSplit({ amount: bill.result.total, mode: 'exact', units: state.units, values: bill.result.owedByUnit, payers })
+    }
     if (!amount) return { ok: false as const, error: 'Enter an amount' }
+    if (state.mode === 'items') return { ok: false as const, error: 'Enter an amount' } // unreachable: narrows the mode
     const values = Object.fromEntries(
       state.units.map((u) => {
         const raw = state.values[u.key] ?? ''
@@ -242,7 +290,7 @@ function ExpenseForm({
       }),
     )
     return buildSplit({ amount, mode: state.mode, units: state.units, values, payers })
-  }, [amount, state.mode, state.units, state.values, payers])
+  }, [bill, amount, state.mode, state.units, state.values, payers])
 
   const myPart = split.ok ? split.parts.find((p) => p.person_id === meId) : undefined
   const myNet = myPart ? myPart.paid - myPart.owed : 0
@@ -250,16 +298,28 @@ function ExpenseForm({
   const save = useLedgerMutation(async () => {
     if (!split.ok || !amount) throw new InputError(t(split.ok ? 'Enter an amount' : split.error))
     const description = state.description.trim() || t('Expense')
+    // A kitty spend keeps the amounts but not the item list.
+    const splitMode = state.mode === 'items' ? 'exact' : state.mode
     const id =
       useKitty && state.groupId
-        ? await api.saveKittyExpense({ description, amount, occurredOn: state.date, groupId: state.groupId, splitMode: state.mode, parts: split.parts })
-        : await api.saveExpense({
+        ? await api.saveKittyExpense({ description, amount, occurredOn: state.date, groupId: state.groupId, splitMode, parts: split.parts })
+        : bill?.extras
+          ? await api.saveItemizedExpense({
+              entryId: existing?.id ?? null,
+              description,
+              occurredOn: state.date,
+              groupId: state.groupId,
+              parts: split.parts,
+              items: toStoredItems(state.units, bill.lines, bill.extras),
+              expectedVersion: existing?.version ?? null,
+            })
+          : await api.saveExpense({
             entryId: existing?.id ?? null,
             description,
             amount,
             occurredOn: state.date,
             groupId: state.groupId,
-            splitMode: state.mode,
+            splitMode,
             parts: split.parts,
             expectedVersion: existing?.version ?? null,
           })
@@ -280,13 +340,19 @@ function ExpenseForm({
   }
 
   const setMode = (mode: SplitMode) => {
+    if (mode === 'items') {
+      const items = state.items.length > 0 ? state.items : [newItem(state.units.map((u) => u.key))]
+      return set({ mode, items })
+    }
+    // Leaving "by item" keeps the bill's total as the amount.
+    const carry = byItem && amount ? { amountText: toRupeeInput(amount) } : {}
     let values: Record<string, string> = {}
     if (mode === 'shares') values = Object.fromEntries(state.units.map((u) => [u.key, String(u.memberIds.length)]))
     if (mode === 'exact' && amount && state.units.length > 0) {
       const parts = splitByWeights(amount, state.units.map((u) => u.memberIds.length))
       values = Object.fromEntries(state.units.map((u, i) => [u.key, toRupeeInput(parts[i])]))
     }
-    set({ mode, values })
+    set({ ...carry, mode, values })
   }
 
   const removeUnit = (key: string) => set({ units: state.units.filter((u) => u.key !== key) })
@@ -334,6 +400,12 @@ function ExpenseForm({
       }
     >
       {/* Amount */}
+      {byItem ? (
+        <div className="mt-2 rounded-3xl bg-white py-6 text-center ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+          <p className="text-5xl font-bold tabular-nums">{amount ? formatINR(amount) : '₹0'}</p>
+          <p className="mt-1 text-sm text-slate-500">{t('Total from {n} items', { n: state.items.filter((i) => i.amountText.trim()).length })}</p>
+        </div>
+      ) : (
       <label className="mt-2 flex items-center justify-center gap-1 rounded-3xl bg-white py-6 ring-1 ring-slate-200 focus-within:ring-2 focus-within:ring-brand-600 dark:bg-slate-900 dark:ring-slate-800">
         <span className="text-3xl font-semibold text-slate-400">₹</span>
         <input
@@ -347,6 +419,7 @@ function ExpenseForm({
           className="max-w-[70vw] bg-transparent text-5xl font-bold tabular-nums outline-none placeholder:text-slate-300 dark:placeholder:text-slate-700"
         />
       </label>
+      )}
 
       {!existing ? (
         pasteOpen ? (
@@ -366,10 +439,21 @@ function ExpenseForm({
             </div>
           </Card>
         ) : (
-          <button type="button" onClick={() => setPasteOpen(true)} className="mt-2 min-h-9 w-full text-center text-sm font-medium text-brand-700 dark:text-brand-500">
-            📋 {t('Paid on UPI? Paste the message')}
-          </button>
+          <div className="mt-2 flex justify-center gap-4">
+            <button type="button" onClick={() => setPasteOpen(true)} className="min-h-9 text-sm font-medium text-brand-700 dark:text-brand-500">
+              📋 {t('Paste UPI message')}
+            </button>
+            {!byItem ? (
+              <button type="button" onClick={() => { setAdvanced(true); setMode('items') }} className="min-h-9 text-sm font-medium text-brand-700 dark:text-brand-500">
+                🧾 {t('Split by item')}
+              </button>
+            ) : null}
+          </div>
         )
+      ) : !byItem ? (
+        <button type="button" onClick={() => { setAdvanced(true); setMode('items') }} className="mt-2 min-h-9 w-full text-center text-sm font-medium text-brand-700 dark:text-brand-500">
+          🧾 {t('Split by item')}
+        </button>
       ) : null}
 
       {/* Description */}
@@ -434,7 +518,7 @@ function ExpenseForm({
                 <span className="block truncate font-medium">{unitLabel(u)}</span>
                 {u.memberIds.length > 1 ? <span className="block text-xs text-slate-500">{t('counted as one · {n} shares', { n: u.memberIds.length })}</span> : null}
               </span>
-              {state.mode === 'equal' ? (
+              {state.mode === 'equal' || byItem ? (
                 <span className="text-sm font-semibold tabular-nums">{owed !== undefined ? formatINR(owed) : '—'}</span>
               ) : (
                 <span className="flex items-center gap-2">
@@ -473,10 +557,25 @@ function ExpenseForm({
               { value: 'equal', label: t('Equally') },
               { value: 'exact', label: t('Amounts') },
               { value: 'shares', label: t('Shares') },
+              { value: 'items', label: t('By item') },
             ]}
           />
           {state.mode === 'exact' && amount ? <ExactRemaining amount={amount} units={state.units} values={state.values} /> : null}
         </div>
+        {bill ? (
+          <ItemsEditor
+            units={state.units}
+            unitLabel={unitLabel}
+            items={state.items}
+            onItems={(items) => set({ items })}
+            extras={state.extras}
+            onExtras={(extras) => set({ extras })}
+            receiptText={state.amountText}
+            onReceiptText={(amountText) => set({ amountText })}
+            result={bill.result}
+            subtotal={bill.subtotal}
+          />
+        ) : null}
   
         {/* Paid by */}
         <SectionTitle>{t('Paid by')}</SectionTitle>

@@ -6,6 +6,8 @@ const person = (id: string): SplitUnit => ({ key: id, repId: id, memberIds: [id]
 describe('splitByWeights', () => {
   it('always adds up exactly and hands out leftover paise in order', () => {
     expect(splitByWeights(100, [1, 1, 1])).toEqual([34, 33, 33])
+    // Equal remainders that floating point would order by noise: the earlier row still wins.
+    expect(splitByWeights(6000, [20000, 50000, 20000])).toEqual([1334, 3333, 1333])
     expect(splitByWeights(1000, [2, 1])).toEqual([667, 333])
     for (let amount = 1; amount < 500; amount += 7) {
       const parts = splitByWeights(amount, [1, 2.5, 3, 0])

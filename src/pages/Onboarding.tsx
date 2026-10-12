@@ -5,6 +5,7 @@ import { Button, Field, TextInput } from '../components/ui'
 import { keys } from '../hooks/queries'
 import { api } from '../lib/api'
 import { friendlyError } from '../lib/errors'
+import { clearInvite, pendingInvite } from '../lib/invite'
 import { normalizePhone } from '../lib/phone'
 import { isLikelyUpiId } from '../lib/upi'
 import { useT } from '../lib/i18n'
@@ -20,6 +21,7 @@ export function OnboardingPage() {
   const [upi, setUpi] = useState('')
   const [errors, setErrors] = useState<{ name?: string; phone?: string; upi?: string; form?: string }>({})
   const [busy, setBusy] = useState(false)
+  const [invite] = useState(pendingInvite)
 
   const submit = async (event: FormEvent) => {
     event.preventDefault()
@@ -33,7 +35,8 @@ export function OnboardingPage() {
     if (next.name || next.phone || next.upi) return
     setBusy(true)
     try {
-      await api.claimProfile(name.trim(), e164!, upi.trim() || null)
+      await api.claimProfile(name.trim(), e164!, upi.trim() || null, invite)
+      clearInvite()
       await client.invalidateQueries({ queryKey: keys.me })
     } catch (error) {
       setErrors({ form: friendlyError(error) })
@@ -47,6 +50,11 @@ export function OnboardingPage() {
       <p className="mt-1 text-slate-600 dark:text-slate-300">
         {t('Your friends add you using your mobile number. If someone already added you, your history shows up right away.')}
       </p>
+      {invite ? (
+        <p className="mt-3 rounded-2xl bg-brand-50 p-3 text-sm text-brand-800 ring-1 ring-brand-100 dark:bg-brand-800/30 dark:text-brand-100 dark:ring-brand-800">
+          🎉 {t('You came from a friend’s invite. Enter the number they saved for you and your hisaab moves in.')}
+        </p>
+      ) : null}
       <div className="mt-8 space-y-5">
         <Field label={t('Your name')} error={errors.name}>
           <TextInput value={name} onChange={(e) => setName(e.target.value)} autoComplete="name" maxLength={60} />

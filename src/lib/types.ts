@@ -1,6 +1,7 @@
 import type { Paise } from './money'
 import type { Allocation } from './settle'
 import type { Style } from './baari'
+import type { StoredItems } from './itemSplit'
 import type { EntryPart, SplitMode, SplitUnit } from './split'
 
 export type EntryKind = 'expense' | 'payment' | 'forgive' | 'treat'
@@ -153,6 +154,16 @@ export interface ActivityRow {
   my_delta: Paise
 }
 
+export interface SearchRow {
+  entry_id: string
+  kind: EntryKind
+  description: string
+  amount: Paise
+  occurred_on: string
+  group_id: string | null
+  my_delta: Paise
+}
+
 export interface EntryDetail {
   id: string
   kind: EntryKind
@@ -163,6 +174,8 @@ export interface EntryDetail {
   occurred_on: string
   group_id: string | null
   split_mode: SplitMode | null
+  /** the bill, for expenses split by item */
+  items: StoredItems | null
   method: string | null
   created_by: string
   created_at: string

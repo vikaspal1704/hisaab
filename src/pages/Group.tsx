@@ -106,7 +106,15 @@ export function GroupPage() {
         ))}
       </Card>
 
-      <SectionTitle>{t('Recent')}</SectionTitle>
+      <SectionTitle
+        action={
+          <Link to={`/statement/g/${id}`} className="flex min-h-9 items-center text-sm font-semibold text-brand-700 dark:text-brand-500">
+            ⬇️ {t('Export')}
+          </Link>
+        }
+      >
+        {t('Recent')}
+      </SectionTitle>
       {entries.isPending ? (
         <LoadingView />
       ) : (entries.data ?? []).length === 0 ? (

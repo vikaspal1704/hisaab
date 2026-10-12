@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { Avatar, AvatarStack } from '../components/Avatar'
 import { Page } from '../components/Page'
+import { PayMeSheet } from '../components/PayMeSheet'
 import { useToast } from '../components/Toast'
 import { Button, ButtonLink, Card, Field, LoadingView, Row, SectionTitle, Segmented, TextInput } from '../components/ui'
 import { useHouseholds, useLedgerMutation, usePeople, useShortcuts } from '../hooks/queries'
@@ -18,6 +19,7 @@ export function ProfilePage() {
   const people = usePeople()
   const households = useHouseholds()
   const me = people.me
+  const [showQr, setShowQr] = useState(false)
 
   if (!me) return <Page title={t('Me')} withNav><LoadingView /></Page>
 
@@ -30,6 +32,10 @@ export function ProfilePage() {
           <p className="text-sm text-slate-500 dark:text-slate-400">{formatPhone(me.phone)}</p>
         </div>
       </div>
+      <Button variant="secondary" block className="mt-4" onClick={() => setShowQr(true)}>
+        📱 {t('My UPI QR — let friends scan to pay')}
+      </Button>
+      {showQr ? <PayMeSheet open onClose={() => setShowQr(false)} /> : null}
 
       <ProfileForm key={`${me.display_name}|${me.upi_id}`} name={me.display_name} phone={me.phone} upi={me.upi_id ?? ''} />
 

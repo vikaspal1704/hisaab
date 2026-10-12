@@ -15,6 +15,7 @@ import { formatINR, parseRupees, toRupeeInput } from '../lib/money'
 import { planHouseholdPayment, type Allocation, type PaymentPlan } from '../lib/settle'
 import { copyText, reminderText, whatsappLink } from '../lib/share'
 import type { PaymentMethod, Person } from '../lib/types'
+import { PayMeSheet } from '../components/PayMeSheet'
 import { upiPayLink } from '../lib/upi'
 
 const METHODS: { value: PaymentMethod; label: string }[] = [
@@ -68,6 +69,7 @@ function SettleForm({ me, title, members }: { me: Person; title: string; members
   const [actor, setActor] = useState(defaultActor)
   const [amountText, setAmountText] = useState(combined !== 0 ? toRupeeInput(Math.abs(combined)) : '')
   const [date, setDate] = useState(todayISO())
+  const [showQr, setShowQr] = useState(false)
   const [note, setNote] = useState('')
   const counterpart = people.byId.get(actor)
   const receiverUpi = iPay ? counterpart?.upi_id : me.upi_id
@@ -238,6 +240,12 @@ function SettleForm({ me, title, members }: { me: Person; title: string; members
             <IconCopy size={16} /> {counterpart.upi_id}
           </button>
         ) : null}
+        {!iPay && method === 'upi' && amount ? (
+          <button type="button" onClick={() => setShowQr(true)} className="flex min-h-10 items-center gap-2 text-sm font-semibold text-brand-700 dark:text-brand-500">
+            📱 {t('Show my UPI QR for {amount}', { amount: formatINR(amount) })}
+          </button>
+        ) : null}
+        {showQr && amount ? <PayMeSheet open onClose={() => setShowQr(false)} amount={amount} payerName={counterpartName} /> : null}
         {!iPay && combined > 0 && counterpart ? (
           <a
             href={whatsappLink(counterpart.phone, reminderText(counterpartName, combined, me.upi_id))}

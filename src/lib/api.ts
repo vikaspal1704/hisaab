@@ -1,3 +1,4 @@
+import type { StoredItems } from './itemSplit'
 import type { Paise } from './money'
 import type { Allocation } from './settle'
 import type { EntryPart, SplitMode, SplitUnit } from './split'
@@ -10,6 +11,7 @@ import type {
   Reaction,
   RecurringRule,
   ReviewRow,
+  SearchRow,
   SharedView,
   Shortcut,
   TreatSummary,
@@ -36,8 +38,10 @@ export const api = {
     return rpc<string | null>('me')
   },
 
-  claimProfile(name: string, phone: string, upiId: string | null) {
-    return rpc<string>('claim_profile', { p_name: name, p_phone: phone, p_upi_id: upiId })
+  /** `invite` is a passbook link token a friend sent to this number (see claim_profile). */
+  claimProfile(name: string, phone: string, upiId: string | null, invite: string | null = null) {
+    // p_invite only when present, so this keeps working on a database without it yet.
+    return rpc<string>('claim_profile', { p_name: name, p_phone: phone, p_upi_id: upiId, ...(invite ? { p_invite: invite } : {}) })
   },
 
   addContact(phone: string, name: string) {
@@ -127,7 +131,7 @@ export const api = {
     const { data, error } = await supabase
       .from('entries')
       .select(
-        `id, kind, description, amount, occurred_on, group_id, split_mode, method, created_by, created_at,
+        `id, kind, description, amount, occurred_on, group_id, split_mode, items, method, created_by, created_at,
          updated_at, deleted_at, version, occasion, kitty,
          reactions:entry_reactions(entry_id, person_id, status, note),
          parts:entry_parts(person_id, paid, owed, shares),
@@ -171,6 +175,40 @@ export const api = {
       p_parts: args.parts,
       p_expected_version: args.expectedVersion,
     })
+  },
+
+  saveItemizedExpense(args: {
+    entryId: string | null
+    description: string
+    occurredOn: string
+    groupId: string | null
+    parts: EntryPart[]
+    items: StoredItems
+    expectedVersion: number | null
+  }) {
+    return rpc<string>('save_itemized_expense', {
+      p_entry: args.entryId,
+      p_description: args.description,
+      p_occurred_on: args.occurredOn,
+      p_group: args.groupId,
+      p_parts: args.parts,
+      p_items: args.items,
+      p_expected_version: args.expectedVersion,
+    })
+  },
+
+  async groupStatement(groupId: string) {
+    const rows = await rpc<{ entry_id: string; kind: string; description: string; amount: Paise; occurred_on: string; payers: Record<string, Paise>; effects: Record<string, Paise> }[]>(
+      'group_statement',
+      { p_group: groupId },
+    )
+    const nums = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, num(v)]))
+    return rows.map((r) => ({ ...r, amount: num(r.amount), payers: nums(r.payers), effects: nums(r.effects) }))
+  },
+
+  async search(query: string): Promise<SearchRow[]> {
+    const rows = await rpc<SearchRow[]>('search_entries', { p_query: query, p_limit: 50 })
+    return rows.map((r) => ({ ...r, amount: num(r.amount), my_delta: num(r.my_delta) }))
   },
 
   savePayment(args: {

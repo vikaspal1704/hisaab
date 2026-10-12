@@ -25,6 +25,7 @@ import { ProfilePage } from './pages/Profile'
 import { SettleUpPage } from './pages/SettleUp'
 import { SetupNeededPage } from './pages/SetupNeeded'
 import { SharedPage } from './pages/Shared'
+import { StatementPage } from './pages/Statement'
 import { TreatPage } from './pages/Treat'
 import { useRecurringRunner } from './hooks/useRecurringRunner'
 import { takeSharedText } from './lib/shareTarget'
@@ -83,6 +84,7 @@ export function App() {
         <Route path="/e/:id/edit" element={<ExpenseFormPage />} />
         <Route path="/settle/:kind/:id" element={<SettleUpPage />} />
         <Route path="/treat" element={<TreatPage />} />
+        <Route path="/statement/:kind/:id" element={<StatementPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {NAV_ROUTES.includes(location.pathname) ? <BottomNav /> : null}

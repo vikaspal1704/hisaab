@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { InviteSheet } from '../components/FriendSheets'
 import { IconContacts, IconWhatsApp } from '../components/icons'
 import { Page } from '../components/Page'
 import { Button, ButtonLink, Card, Field, TextInput } from '../components/ui'
@@ -8,8 +9,6 @@ import { api } from '../lib/api'
 import { friendlyError, InputError } from '../lib/errors'
 import { normalizePhone } from '../lib/phone'
 import { useT } from '../lib/i18n'
-import { inviteText, whatsappLink } from '../lib/share'
-
 
 export function AddFriendPage() {
   const navigate = useNavigate()
@@ -19,6 +18,7 @@ export function AddFriendPage() {
   const [phone, setPhone] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [added, setAdded] = useState<{ id: string; name: string; phone: string }[]>([])
+  const [inviting, setInviting] = useState<string | null>(null)
   const add = useLedgerMutation((args: { phone: string; name: string }) => api.addContact(args.phone, args.name))
 
   const addOne = async (rawName: string, rawPhone: string) => {
@@ -69,9 +69,9 @@ export function AddFriendPage() {
                 <span className="block text-xs text-slate-500">{registered(a.id) ? t('Already on Hisaab') : t('Not on Hisaab yet')}</span>
               </span>
               {!registered(a.id) ? (
-                <a href={whatsappLink(a.phone, inviteText(a.name))} target="_blank" rel="noreferrer" className="flex min-h-9 items-center gap-1 rounded-full bg-[#25D366]/15 px-3 text-sm font-semibold text-[#128C7E] dark:text-[#25D366]">
+                <button type="button" onClick={() => setInviting(a.id)} className="flex min-h-9 items-center gap-1 rounded-full bg-[#25D366]/15 px-3 text-sm font-semibold text-[#128C7E] dark:text-[#25D366]">
                   <IconWhatsApp size={16} /> {t('Invite')}
-                </a>
+                </button>
               ) : null}
             </div>
           ))}
@@ -87,6 +87,7 @@ export function AddFriendPage() {
           {t('Friends don’t need the app to start. Add them now — when they sign up with this number, they’ll see everything.')}
         </p>
       )}
+      {inviting ? <InviteSheet open onClose={() => setInviting(null)} personId={inviting} /> : null}
     </Page>
   )
 }

@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
-import { ForgiveSheet, FriendSettingsSheet, LentSheet, NudgeSheet, ShareSheet } from '../components/FriendSheets'
+import { ForgiveSheet, FriendSettingsSheet, InviteSheet, LentSheet, NudgeSheet, ShareSheet } from '../components/FriendSheets'
 import { IconSwap, IconWhatsApp } from '../components/icons'
 import { toneClass } from '../components/Money'
 import { HeaderButton, Page } from '../components/Page'
+import { PayMeSheet } from '../components/PayMeSheet'
 import { ButtonLink, Card, EmptyState, ErrorView, LoadingView, SectionTitle } from '../components/ui'
 import {
   useBalances,
@@ -21,10 +22,9 @@ import { formatDay, formatMonth } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { formatINR } from '../lib/money'
 import { formatPhone } from '../lib/phone'
-import { inviteText, whatsappLink } from '../lib/share'
 import type { LedgerRow, Reaction } from '../lib/types'
 
-type SheetName = 'settings' | 'lent' | 'forgive' | 'share' | 'nudge' | null
+type SheetName = 'settings' | 'lent' | 'forgive' | 'share' | 'nudge' | 'qr' | 'invite' | null
 
 export function FriendPage() {
   const { id = '' } = useParams()
@@ -117,6 +117,9 @@ export function FriendPage() {
           <button type="button" onClick={() => setSheet('lent')} className={`${pill} bg-slate-200/70 dark:bg-slate-800`}>🤝 {t('Lent / borrowed')}</button>
           <Link to={`/treat?with=${id}`} className={`${pill} bg-slate-200/70 dark:bg-slate-800`}>🎁 {t('Treat')}</Link>
           {net > 0 ? (
+            <button type="button" onClick={() => setSheet('qr')} className={`${pill} bg-slate-200/70 dark:bg-slate-800`}>📱 {t('QR to pay')}</button>
+          ) : null}
+          {net > 0 ? (
             <button type="button" onClick={() => setSheet('forgive')} className={`${pill} bg-slate-200/70 dark:bg-slate-800`}>🙏 {t('Chhod do')}</button>
           ) : null}
           {state.kind === 'they_owe' ? (
@@ -125,12 +128,21 @@ export function FriendPage() {
             </button>
           ) : null}
           <button type="button" onClick={() => setSheet('share')} className={`${pill} bg-slate-200/70 dark:bg-slate-800`}>🔗 {t('Share hisaab')}</button>
+          <Link to={`/statement/p/${id}`} className={`${pill} bg-slate-200/70 dark:bg-slate-800`}>⬇️ {t('Export')}</Link>
           {!person.is_registered ? (
-            <a href={whatsappLink(person.phone, inviteText(name))} target="_blank" rel="noreferrer" className={`${pill} bg-[#25D366]/15 text-[#128C7E] dark:text-[#25D366]`}>
+            <button type="button" onClick={() => setSheet('invite')} className={`${pill} bg-[#25D366]/15 text-[#128C7E] dark:text-[#25D366]`}>
               <IconWhatsApp size={18} /> {t('Invite')}
-            </a>
+            </button>
           ) : null}
         </div>
+        {!person.is_registered ? (
+          <p className="mt-4 rounded-2xl bg-sky-50 p-3 text-left text-sm text-sky-900 ring-1 ring-sky-200 dark:bg-sky-950/40 dark:text-sky-100 dark:ring-sky-900">
+            {t('{name} isn’t on Hisaab yet — that’s fine. Keep adding expenses: they’re saved against {phone}, and {name} sees all of it the day they join with that number.', {
+              name: name.split(' ')[0],
+              phone: formatPhone(person.phone),
+            })}
+          </p>
+        ) : null}
         {household ? (
           <Link to={`/h/${household.id}`} className="mt-3 text-sm font-medium text-brand-700 dark:text-brand-500">
             {t('Part of “{name}” →', { name: household.name })}
@@ -175,6 +187,8 @@ export function FriendPage() {
       {sheet === 'lent' ? <LentSheet open onClose={() => setSheet(null)} personId={id} /> : null}
       {sheet === 'forgive' ? <ForgiveSheet open onClose={() => setSheet(null)} personId={id} owed={net} /> : null}
       {sheet === 'share' ? <ShareSheet open onClose={() => setSheet(null)} personId={id} /> : null}
+      {sheet === 'invite' ? <InviteSheet open onClose={() => setSheet(null)} personId={id} /> : null}
+      {sheet === 'qr' ? <PayMeSheet open onClose={() => setSheet(null)} amount={net} payerName={name} recordTo={`/settle/person/${id}`} /> : null}
       {sheet === 'nudge' ? <NudgeSheet open onClose={() => setSheet(null)} personId={id} amount={net} /> : null}
     </Page>
   )

@@ -82,7 +82,7 @@ export function ContactChecklist({
   )
 }
 
-export function SearchBox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+export function SearchBox({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
   const { t } = useT()
   return (
     <div className="relative">
@@ -91,7 +91,7 @@ export function SearchBox({ value, onChange }: { value: string; onChange: (v: st
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={t('Search name or number')}
+        placeholder={placeholder ?? t('Search name or number')}
         aria-label={t('Search')}
         className={`${inputClass} pl-10`}
       />

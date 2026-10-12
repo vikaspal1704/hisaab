@@ -32,7 +32,8 @@ export const useHouseholds = () => useQuery({ queryKey: keys.households, queryFn
 export const useGroups = () => useQuery({ queryKey: keys.groups, queryFn: api.groups })
 export const useGroupBalances = (id: string) =>
   useQuery({ queryKey: keys.groupBalances(id), queryFn: () => api.groupBalances(id) })
-export const usePersonLedger = (id: string) => useQuery({ queryKey: keys.ledger(id), queryFn: () => api.personLedger(id) })
+export const usePersonLedger = (id: string, enabled = true) =>
+  useQuery({ queryKey: keys.ledger(id), queryFn: () => api.personLedger(id), enabled })
 export const useActivity = () => useQuery({ queryKey: keys.activity, queryFn: () => api.activity(100) })
 export const useEntry = (id: string | undefined) =>
   useQuery({ queryKey: keys.entry(id ?? ''), queryFn: () => api.entry(id!), enabled: Boolean(id) })

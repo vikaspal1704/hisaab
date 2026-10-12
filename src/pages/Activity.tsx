@@ -1,16 +1,19 @@
-import { useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { SearchBox } from '../components/PeoplePicker'
 import { IconActivity } from '../components/icons'
 import { toneClass } from '../components/Money'
 import { Page } from '../components/Page'
 import { Card, EmptyState, ErrorView, LoadingView } from '../components/ui'
 import { useActivity, usePeople } from '../hooks/queries'
 import { friendlyError } from '../lib/errors'
-import { formatRelative } from '../lib/format'
+import { api } from '../lib/api'
+import { formatDay, formatRelative } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { formatINR } from '../lib/money'
 import { markActivitySeen } from '../hooks/useUnread'
-import type { ActivityRow } from '../lib/types'
+import type { ActivityRow, SearchRow } from '../lib/types'
 
 export function ActivityPage() {
   const activity = useActivity()
@@ -20,10 +23,17 @@ export function ActivityPage() {
   useEffect(() => {
     if (newest) markActivitySeen(newest)
   }, [newest])
+  const [query, setQuery] = useState('')
+  const search = useDebounced(query.trim(), 250)
 
   return (
     <Page title={t('Activity')} withNav>
-      {activity.isPending || people.isPending ? (
+      <div className="mt-2">
+        <SearchBox value={query} onChange={setQuery} placeholder={t('Search: dosa, Goa, Rahul, 450…')} />
+      </div>
+      {query.trim() ? (
+        <SearchResults query={search} />
+      ) : activity.isPending || people.isPending ? (
         <LoadingView />
       ) : activity.error ? (
         <ErrorView message={friendlyError(activity.error)} onRetry={() => activity.refetch()} />
@@ -40,9 +50,55 @@ export function ActivityPage() {
   )
 }
 
+function useDebounced(value: string, ms: number) {
+  const [debounced, setDebounced] = useState(value)
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), ms)
+    return () => clearTimeout(timer)
+  }, [value, ms])
+  return debounced
+}
+
+/** Every entry of mine matching what, item, group, friend or amount. */
+function SearchResults({ query }: { query: string }) {
+  const { t } = useT()
+  const results = useQuery({ queryKey: ['search', query], queryFn: () => api.search(query), enabled: query.length > 0 })
+  if (!query || results.isPending) return <LoadingView />
+  if (results.error) return <ErrorView message={friendlyError(results.error)} onRetry={() => results.refetch()} />
+  if (results.data.length === 0) return <EmptyState title={t('Nothing matches “{query}”', { query })} body={t('Try a friend’s name, a place, an item or an amount.')} />
+  return (
+    <>
+      <p className="mt-3 px-1 text-sm text-slate-500">{t('{n} found', { n: results.data.length })}</p>
+      <Card className="mt-2 divide-y divide-slate-100 overflow-hidden dark:divide-slate-800">
+        {results.data.map((row) => (
+          <SearchItem key={row.entry_id} row={row} />
+        ))}
+      </Card>
+    </>
+  )
+}
+
+function SearchItem({ row }: { row: SearchRow }) {
+  const effect = useEffectText()({ ...row, is_deleted: false })
+  return (
+    <Link to={`/e/${row.entry_id}`} className="flex items-start gap-3 px-4 py-3 active:bg-slate-50 dark:active:bg-slate-800/60">
+      <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg dark:bg-slate-800" aria-hidden>
+        {ICON[row.kind]}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-medium">{row.description}</span>
+        <span className="block text-sm text-slate-500 dark:text-slate-400">
+          {formatINR(row.amount)} · {formatDay(row.occurred_on)}
+        </span>
+        <span className={`block text-sm font-medium ${toneClass(effect.net)}`}>{effect.text}</span>
+      </span>
+    </Link>
+  )
+}
+
 function useEffectText() {
   const { t } = useT()
-  return (row: ActivityRow) => {
+  return (row: Pick<ActivityRow, 'is_deleted' | 'kind' | 'my_delta'>) => {
     if (row.is_deleted) return { text: t('no longer counts'), net: 0 }
     if (row.kind === 'treat') return { text: t('a treat 🎁 — nobody owes'), net: 0 }
     if (row.my_delta === 0) return { text: row.kind === 'payment' ? t('no change for you') : t('not involved'), net: 0 }

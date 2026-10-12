@@ -4,6 +4,9 @@ const MESSAGES: Record<string, string> = {
   profile_required: 'Finish setting up your profile first.',
   phone_taken: 'This number is already linked to another account.',
   phone_mismatch: 'Use the same number you signed in with.',
+  phone_needs_invite:
+    'A friend has already been keeping hisaab with this number. To link it to you, open the Hisaab link they sent you on WhatsApp (or ask them to tap “Invite” on your name), then sign in again.',
+  invalid_items: 'Check the items: each needs a name, a price and at least one person.',
   cannot_add_self: 'That’s your own number.',
   unknown_person: 'Add this person as a friend first.',
   split_mismatch: 'The split doesn’t add up to the total.',

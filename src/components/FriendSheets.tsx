@@ -7,13 +7,13 @@ import { todayISO } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { formatINR, parseRupees, toRupeeInput, type Paise } from '../lib/money'
 import { nudgeMessage, type Tone } from '../lib/nudge'
-import { appUrl, whatsappLink } from '../lib/share'
+import { formatPhone } from '../lib/phone'
+import { inviteText, sharedUrl, whatsappLink } from '../lib/share'
 import type { ContactPrefs } from '../lib/types'
 import { Sheet } from './Sheet'
 import { useToast } from './Toast'
 import { Button, Field, inputClass, Segmented, TextInput } from './ui'
 
-const sharedUrl = (token: string) => `${appUrl()}#/s/${token}`
 
 /** "I gave Rahul ₹200" / "Rahul gave me ₹200" — a loan, not a shared bill. */
 export function LentSheet({ open, onClose, personId: fixedPerson }: { open: boolean; onClose: () => void; personId?: string }) {
@@ -187,7 +187,7 @@ export function NudgeSheet({ open, onClose, personId, amount }: { open: boolean;
           />
           <span className="text-sm">{t('Include a link to our hisaab (no app needed)')}</span>
         </label>
-        <p className="rounded-2xl bg-slate-100 p-3 text-sm whitespace-pre-line dark:bg-slate-800">{message}</p>
+        <p className="rounded-2xl bg-slate-100 p-3 text-sm whitespace-pre-line [overflow-wrap:anywhere] dark:bg-slate-800">{message}</p>
         <a
           href={whatsappLink(person.phone, message)}
           target="_blank"
@@ -350,6 +350,50 @@ export function ShareSheet({ open, onClose, personId }: { open: boolean; onClose
           </Button>
         )}
         {create.error ? <p className="text-sm text-red-600">{friendlyError(create.error)}</p> : null}
+      </div>
+    </Sheet>
+  )
+}
+
+/**
+ * Invite a friend who isn't on Hisaab yet. The message carries our passbook
+ * link: they can see it straight away, and joining from it links everything
+ * recorded against their number to their new account.
+ */
+export function InviteSheet({ open, onClose, personId }: { open: boolean; onClose: () => void; personId: string }) {
+  const { t } = useT()
+  const people = usePeople()
+  const person = people.byId.get(personId)
+  const [token, setToken] = useState<string | null>(null)
+  const link = useLedgerMutation(() => api.createShareLink(personId))
+  const { mutate: createLink, isPending: creatingLink, isError } = link
+
+  useEffect(() => {
+    if (open && !token && !creatingLink && !isError) createLink(undefined, { onSuccess: setToken })
+  }, [open, token, creatingLink, isError, createLink])
+
+  if (!person) return null
+  const message = token ? inviteText(person.display_name.split(' ')[0], sharedUrl(token)) : ''
+  return (
+    <Sheet open={open} onClose={onClose} title={t('Invite {name}', { name: person.display_name })}>
+      <div className="space-y-4">
+        <p className="text-sm text-slate-600 dark:text-slate-300">
+          {t('They can see your hisaab from the link without signing up. When they join with {phone}, everything you’ve added shows up in their account.', {
+            phone: formatPhone(person.phone),
+          })}
+        </p>
+        {token ? <p className="rounded-2xl bg-slate-100 p-3 text-sm whitespace-pre-line [overflow-wrap:anywhere] dark:bg-slate-800">{message}</p> : null}
+        <a
+          href={token ? whatsappLink(person.phone, message) : undefined}
+          target="_blank"
+          rel="noreferrer"
+          aria-disabled={!token}
+          onClick={(e) => (token ? onClose() : e.preventDefault())}
+          className={`flex min-h-12 items-center justify-center rounded-xl bg-[#25D366] font-semibold text-white ${token ? '' : 'opacity-60'}`}
+        >
+          {token ? t('Send on WhatsApp') : t('Preparing link…')}
+        </a>
+        {link.error ? <p className="text-sm text-red-600">{friendlyError(link.error)}</p> : null}
       </div>
     </Sheet>
   )

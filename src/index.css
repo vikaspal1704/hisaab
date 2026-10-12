@@ -54,3 +54,15 @@ input::-webkit-inner-spin-button {
   .animate-sheet-in,
   .animate-fade-in { animation: none; }
 }
+
+/* Statements print as plain black-on-white documents (Save as PDF). */
+@media print {
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  @page {
+    margin: 12mm;
+  }
+}

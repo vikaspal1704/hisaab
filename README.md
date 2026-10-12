@@ -25,8 +25,24 @@ tiers: **GitHub Pages** for the app and **Supabase** for the database and login.
 - **Settle up with UPI.** Opens GPay, PhonePe or Paytm with the friend's UPI ID and the
   amount filled in. The payment is only recorded after you confirm it went through. You can
   also copy the UPI ID, record cash, or send a friendly WhatsApp reminder.
-- **Friends don't need the app to start.** Add them by phone number. When they sign in with
-  that number, they see their whole history.
+- **Friends don't need the app to start.** Add them by phone number and keep adding expenses:
+  everything is saved against that number. "Invite" sends them your passbook link on
+  WhatsApp; they can see it without signing up, and when they tap **Join** and sign in with
+  that number, the whole history moves into their account. (With Google sign-in the number
+  isn't verified, so a number that already has history can only be taken from such a link,
+  or with SMS OTP. Nobody can sign up with your friend's number and read their books.)
+- **Split by item.** Type the bill line by line (pizza for everyone, beer just for Rahul), add
+  tax/GST (5, 10 or 18% in one tap), tip and discount, and each person's share works out to the
+  paisa: items equally among who had them, charges in proportion. Enter the receipt total to
+  check nothing was missed. The entry keeps the itemised bill for everyone to see.
+- **Pay-me QR.** Show a UPI QR (with the amount filled in) that any UPI app can scan, or
+  save it as an image. UPI stopped person-to-person "collect" requests in October 2025, so this
+  is the easy way to ask. Then record the payment in one tap.
+- **Search.** Find any entry by what it was, an item on the bill, a group, a friend or an
+  amount ("dosa", "Goa", "Rahul", "450").
+- **Export.** Download any friend's passbook or a group's full statement as CSV (Excel, Google
+  Sheets) or save it as a PDF. The group statement lists every entry with each member's effect
+  and a closing balance.
 - **Import your contacts.** Pick many friends at once with the phone's contact picker (Android
   Chrome), or import a `.vcf`/`.csv` export from iPhone, Android or Google Contacts. You tick who
   to add and they're added in one go. Importing again later only offers new people, so it
@@ -113,7 +129,8 @@ You need a GitHub account, a Supabase account (free) and a Google Cloud account 
    `supabase/migrations/20261012000000_init.sql`, and click **Run**. Then do the same with
    `supabase/migrations/20261013000000_friendship_features.sql`, then
    `supabase/migrations/20261014000000_bulk_contacts.sql`, then
-   `supabase/migrations/20261015000000_office_and_kitty.sql`, in that order. If a file says
+   `supabase/migrations/20261015000000_office_and_kitty.sql`, then
+   `supabase/migrations/20261016000000_items_search_invites.sql`, in that order. If a file says
    something "already exists", it was run before: skip it and run the next one.
 3. Open **Project Settings → API** and note the **Project URL** and the **anon / publishable
    key**. Both are meant to be public; Row Level Security protects the data.
@@ -214,10 +231,11 @@ tests/db/              integration tests for the SQL (balances, payments, RLS, a
 
 ## Known limitations and ideas
 
-- With Google login, a phone number is claimed rather than verified. That's fine among
-  friends, and a number can only be claimed once. Enable SMS OTP for verified numbers.
+- With Google login, a phone number is claimed rather than verified. A number nobody has
+  recorded anything against can be claimed by whoever types it first; one with history needs
+  the invite link (or SMS OTP). Enable SMS OTP for fully verified numbers.
 - Payments, treats and "chhod do" entries can be deleted (and re-recorded) but not edited.
-- Group screens show the entries you're part of. Group balances only count expenses tagged
+- Group screens show the entries you're part of; the exported group statement lists them all. Group balances only count expenses tagged
   to that group, so private debts between two members stay private.
 - Logging from UPI reads text, not screenshots. GPay often shares an image, so use
   "Paste the message" with the bank SMS or the text from the payment screen.
@@ -225,4 +243,7 @@ tests/db/              integration tests for the SQL (balances, payments, RLS, a
   automatically. Use the contact picker (Android Chrome) or re-import a contacts file.
 - Repeating expenses are posted when a member opens the app on or after the due day.
 - Anyone holding a share link can see that one passbook until you turn the link off.
-- Not done yet: receipt photos, CSV export, and multiple currencies.
+- "Save as PDF" uses the browser's print dialog (choose "Save as PDF"). On an iPhone home-screen
+  app, use Download CSV or open Hisaab in Safari to print.
+- An itemised bill paid from a trip kitty keeps the amounts but not the item list.
+- Not done yet: receipt photo scanning, offline entry, and multiple currencies.

@@ -202,7 +202,9 @@ function ExpenseBreakdown({ e, name }: { e: EntryDetail; name: (id: string, opts
       ? t('Split equally')
       : e.split_mode === 'shares'
         ? t('Split by shares')
-        : t('Split by amount')
+        : e.split_mode === 'items'
+          ? t('Split by item')
+          : t('Split by amount')
   return (
     <>
       <SectionTitle>{isTreat ? t('Treat by') : t('Paid by')}</SectionTitle>
@@ -222,6 +224,39 @@ function ExpenseBreakdown({ e, name }: { e: EntryDetail; name: (id: string, opts
             amount={isTreat ? null : p.owed}
             note={p.shares ? t('{n} shares', { n: p.shares }) : undefined}
           />
+        ))}
+      </Card>
+      {e.items ? <BillItems items={e.items} name={name} /> : null}
+    </>
+  )
+}
+
+/** The bill line by line, with who had each item. */
+function BillItems({ items, name }: { items: NonNullable<EntryDetail['items']>; name: (id: string) => string }) {
+  const { t } = useT()
+  const extras = [
+    { label: t('Tax & charges'), amount: Number(items.tax) },
+    { label: t('Tip'), amount: Number(items.tip) },
+    { label: t('Discount'), amount: -Number(items.discount) },
+  ].filter((x) => x.amount !== 0)
+  return (
+    <>
+      <SectionTitle>{t('The bill')}</SectionTitle>
+      <Card className="divide-y divide-slate-100 dark:divide-slate-800">
+        {items.lines.map((line, i) => (
+          <div key={i} className="flex items-start gap-3 px-4 py-3 text-sm">
+            <span className="min-w-0 flex-1">
+              <span className="block font-medium">{line.name}</span>
+              <span className="block text-slate-500 dark:text-slate-400">{line.people.map((id) => name(id)).join(', ')}</span>
+            </span>
+            <span className="font-semibold tabular-nums">{formatINR(Number(line.amount))}</span>
+          </div>
+        ))}
+        {extras.map((x) => (
+          <div key={x.label} className="flex items-center justify-between px-4 py-2.5 text-sm text-slate-600 dark:text-slate-300">
+            <span>{x.label} <span className="text-xs text-slate-500">· {t('shared by what each had')}</span></span>
+            <span className="tabular-nums">{formatINR(x.amount)}</span>
+          </div>
         ))}
       </Card>
     </>

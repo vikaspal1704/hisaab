@@ -78,8 +78,12 @@ describe('profiles', () => {
     const pending = await addContact(a, { phone: laterPhone }, 'Kabir')
     await paidFor(a, 400, [a, { personId: pending } as TestUser])
 
-    const kabir = await db.signUp('Kabir Real', laterPhone)
-    expect(kabir.personId).toBe(pending)
+    // Signed in with an OTP-verified number (Google sign-in needs an invite link: see items_search_invites.test.ts).
+    const uid = crypto.randomUUID()
+    await db.admin('insert into auth.users (id) values ($1)', [uid])
+    const kabir = { uid, phone: laterPhone.slice(1), personId: pending }
+    const [row] = await db.as<{ id: string }>(kabir, `select public.claim_profile('Kabir Real', $1) as id`, [laterPhone])
+    expect(row.id).toBe(pending)
     expect(await balances(kabir)).toEqual({ [a.personId]: -200 })
   })
 
