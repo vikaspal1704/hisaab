@@ -1,3 +1,4 @@
+import type { CarpoolStyle, CarpoolTrip, Direction, SeatCount } from './carpool'
 import type { StoredItems } from './itemSplit'
 import type { Paise } from './money'
 import type { Allocation } from './settle'
@@ -100,7 +101,8 @@ export const api = {
   async groups(): Promise<Group[]> {
     const { data, error } = await supabase
       .from('groups')
-      .select('id, name, emoji, kind, tolerance, kitty_holder, group_members(person_id)')
+      // "*" so a database without the car pool columns yet still loads.
+      .select('*, group_members(person_id)')
       .order('created_at', { ascending: false })
     if (error) throw error
     return data.map((g) => ({
@@ -110,6 +112,8 @@ export const api = {
       kind: g.kind,
       tolerance: num(g.tolerance),
       kittyHolder: g.kitty_holder,
+      carpoolStyle: g.carpool_style ?? null,
+      carpoolAmount: g.carpool_amount == null ? null : num(g.carpool_amount),
       memberIds: g.group_members.map((m: { person_id: string }) => m.person_id),
     }))
   },
@@ -204,6 +208,42 @@ export const api = {
     )
     const nums = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, num(v)]))
     return rows.map((r) => ({ ...r, amount: num(r.amount), payers: nums(r.payers), effects: nums(r.effects) }))
+  },
+
+  setCarpoolPrefs(groupId: string, style: CarpoolStyle, amount: Paise | null) {
+    return rpc<void>('set_carpool_prefs', { p_group: groupId, p_style: style, p_amount: amount })
+  },
+
+  saveCarpoolTrip(args: { groupId: string; date: string; direction: Direction; driver: string; riders: string[]; amount: Paise | null }) {
+    return rpc<string>('save_carpool_trip', {
+      p_group: args.groupId,
+      p_date: args.date,
+      p_direction: args.direction,
+      p_driver: args.driver,
+      p_riders: args.riders,
+      p_amount: args.amount,
+    })
+  },
+
+  deleteCarpoolTrip(id: string) {
+    return rpc<void>('delete_carpool_trip', { p_trip: id })
+  },
+
+  /** The last few weeks of trips, newest first. */
+  async carpoolTrips(groupId: string, since: string): Promise<CarpoolTrip[]> {
+    const { data, error } = await supabase
+      .from('carpool_trips')
+      .select('id, trip_date, direction, driver_id, riders, amount, entry_id')
+      .eq('group_id', groupId)
+      .gte('trip_date', since)
+      .order('trip_date', { ascending: false })
+      .order('direction', { ascending: false })
+    if (error) throw error
+    return data.map((t) => ({ ...t, amount: t.amount == null ? null : num(t.amount) })) as CarpoolTrip[]
+  },
+
+  async carpoolSummary(groupId: string): Promise<SeatCount[]> {
+    return rpc<SeatCount[]>('carpool_summary', { p_group: groupId })
   },
 
   async search(query: string): Promise<SearchRow[]> {

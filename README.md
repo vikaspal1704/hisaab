@@ -86,6 +86,12 @@ another app, and asking for money back is awkward.
 - **Office crew.** A group type for daily chai and snacks. The group page has a "Today" card:
   last time's amount and items are filled in, you tap anyone who's away, and whoever's baari it
   is pays. Small differences count as even.
+- **Car pool.** A group type for shared rides. Log the morning and evening trips separately
+  in two taps: pick the driver, tap who rode. Each group chooses how it works: **riders pay
+  a fare** to the driver, **split the cost** of each trip among everyone in the car, or **take
+  turns** with no money at all. Hisaab counts who drove and who rode, says whose turn it is,
+  and offers the same car back for the evening. Fares and costs can be changed for any
+  single trip, and a mistaken trip can be undone.
 - **Repeating expenses.** Monthly (rent, WiFi, cook, Netflix), every weekday (a snacks box) or
   daily. They're split equally and added when a member opens the app; anything missed is
   caught up for up to a month.
@@ -130,7 +136,8 @@ You need a GitHub account, a Supabase account (free) and a Google Cloud account 
    `supabase/migrations/20261013000000_friendship_features.sql`, then
    `supabase/migrations/20261014000000_bulk_contacts.sql`, then
    `supabase/migrations/20261015000000_office_and_kitty.sql`, then
-   `supabase/migrations/20261016000000_items_search_invites.sql`, in that order. If a file says
+   `supabase/migrations/20261016000000_items_search_invites.sql`, then
+   `supabase/migrations/20261017000000_carpool.sql`, in that order. If a file says
    something "already exists", it was run before: skip it and run the next one.
 3. Open **Project Settings → API** and note the **Project URL** and the **anon / publishable
    key**. Both are meant to be public; Row Level Security protects the data.

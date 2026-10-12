@@ -8,7 +8,7 @@
 --   so no real person can ever be linked to them. Their logins can't be used.
 -- * Remove it all again with supabase/demo/remove_demo.sql.
 --
--- Needs all five migrations in supabase/migrations.
+-- Needs all six migrations in supabase/migrations.
 
 -- Act as a given user for the RPCs below (they read auth.uid() from these claims).
 create or replace function pg_temp.act(p_uid uuid) returns void
@@ -61,7 +61,7 @@ declare
   dk_uid uuid;   deepak uuid;
   i_uid uuid;    ishita uuid;
   kabir uuid;
-  goa uuid; office uuid; flat uuid;
+  goa uuid; office uuid; flat uuid; carpool uuid;
   e uuid;
   v_payer uuid;
   v_people uuid[];
@@ -237,6 +237,22 @@ begin
   perform public.save_shortcut('🍱 Lunch crew', '🍱 Lunch', null, office,
     (select jsonb_agg(jsonb_build_object('key', m, 'repId', m, 'memberIds', jsonb_build_array(m)))
      from unnest(array[me, rahul, deepak, ishita]) m));
+
+  -- Car pool: fuel split per trip, morning and evening, rotating driver --------------
+  perform pg_temp.act(me_uid);
+  carpool := public.create_group('Car pool', '🚗', array[deepak, ishita]);
+  perform public.set_carpool_prefs(carpool, 'split', 30000);
+  i := 0;
+  for v_day in select g::date from generate_series(d - 8, d - 1, interval '1 day') g
+               where extract(isodow from g) < 6 loop
+    v_payer := (array[deepak, me, ishita])[1 + i % 3];
+    perform pg_temp.act(case v_payer when deepak then dk_uid when ishita then i_uid else me_uid end);
+    perform public.save_carpool_trip(carpool, v_day, 'am', v_payer, array_remove(array[me, deepak, ishita], v_payer), null);
+    -- Ishita leaves early on alternate evenings.
+    v_people := array_remove(array_remove(array[me, deepak, ishita], v_payer), case when i % 2 = 1 and v_payer <> ishita then ishita end);
+    perform public.save_carpool_trip(carpool, v_day, 'pm', v_payer, v_people, case when i = 2 then 35000 end);
+    i := i + 1;
+  end loop;
 
   -- Flat 302: rent and WiFi every month --------------------------------------------
   flat := public.create_group('Flat 302', '🏠', array[priya]);

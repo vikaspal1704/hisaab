@@ -1,6 +1,7 @@
 import type { Paise } from './money'
 import type { Allocation } from './settle'
 import type { Style } from './baari'
+import type { CarpoolStyle } from './carpool'
 import type { StoredItems } from './itemSplit'
 import type { EntryPart, SplitMode, SplitUnit } from './split'
 
@@ -29,7 +30,7 @@ export interface Household {
   memberIds: string[]
 }
 
-export type GroupKind = 'friends' | 'trip' | 'home' | 'office'
+export type GroupKind = 'friends' | 'trip' | 'home' | 'office' | 'carpool'
 
 export interface Group {
   id: string
@@ -39,6 +40,9 @@ export interface Group {
   kind: GroupKind
   tolerance: Paise
   kittyHolder: string | null
+  /** car pools: how trips are paid for, and the fare per rider or cost per trip */
+  carpoolStyle: CarpoolStyle | null
+  carpoolAmount: Paise | null
 }
 
 export interface ContactPrefs {

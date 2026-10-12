@@ -22,6 +22,8 @@ export const keys = {
   shareLink: (id: string) => ['share-link', id] as const,
   kitty: (id: string) => ['kitty', id] as const,
   recurring: (id: string) => ['recurring', id] as const,
+  carpoolTrips: (id: string) => ['carpool-trips', id] as const,
+  carpoolSummary: (id: string) => ['carpool-summary', id] as const,
   reactions: (ids: string[]) => ['reactions', ...ids] as const,
 }
 

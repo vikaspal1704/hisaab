@@ -30,7 +30,7 @@ export function GroupsPage() {
                 to={`/g/${g.id}`}
                 leading={<span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-xl dark:bg-slate-800">{g.emoji ?? '👥'}</span>}
                 title={g.name}
-                subtitle={t('{n} people · {kind}', { n: g.memberIds.length, kind: t({ friends: 'Friends', trip: 'Trip', home: 'Flat / home', office: 'Office crew' }[g.kind]) })}
+                subtitle={t('{n} people · {kind}', { n: g.memberIds.length, kind: t({ friends: 'Friends', trip: 'Trip', home: 'Flat / home', office: 'Office crew', carpool: 'Car pool' }[g.kind]) })}
               />
             ))}
           </Card>

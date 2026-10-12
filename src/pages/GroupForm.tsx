@@ -6,9 +6,10 @@ import { useToast } from '../components/Toast'
 import { Button, ErrorView, Field, LoadingView, SectionTitle, TextInput } from '../components/ui'
 import { useGroups, useLedgerMutation } from '../hooks/queries'
 import { api } from '../lib/api'
-import { friendlyError } from '../lib/errors'
+import { friendlyError, InputError } from '../lib/errors'
 import { parseRupees, toRupeeInput } from '../lib/money'
 import { useT } from '../lib/i18n'
+import type { CarpoolStyle } from '../lib/carpool'
 import type { Group, GroupKind } from '../lib/types'
 
 const KINDS: { value: GroupKind; label: string; hint: string; emoji: string }[] = [
@@ -16,9 +17,16 @@ const KINDS: { value: GroupKind; label: string; hint: string; emoji: string }[] 
   { value: 'trip', label: 'Trip', hint: 'Exact splits, and an optional kitty everyone chips into.', emoji: '✈️' },
   { value: 'home', label: 'Flat / home', hint: 'Exact splits, plus monthly bills like rent and WiFi.', emoji: '🏠' },
   { value: 'office', label: 'Office crew', hint: 'Daily chai and snacks in one tap. Take turns; small differences count as even.', emoji: '☕' },
+  { value: 'carpool', label: 'Car pool', hint: 'Log morning and evening rides in two taps: a fare to the driver, split the fuel, or just take turns.', emoji: '🚗' },
 ]
 
-const EMOJIS = ['👥', '🍻', '🍕', '✈️', '🏠', '🏏', '🎉', '💼', '🎓', '🏖️']
+const CARPOOL_STYLES: { value: CarpoolStyle; label: string; hint: string; amountLabel?: string }[] = [
+  { value: 'fare', label: 'Riders pay a fare', hint: 'Each rider pays the driver a fixed amount per trip.', amountLabel: 'Fare per rider, per trip (₹)' },
+  { value: 'split', label: 'Split the cost', hint: 'Whoever drives pays fuel/toll; it’s shared by everyone in the car.', amountLabel: 'Usual cost of one trip (₹)' },
+  { value: 'turns', label: 'Take turns driving', hint: 'No money. Hisaab counts who drove and who rode, and says whose turn it is.' },
+]
+
+const EMOJIS = ['👥', '🍻', '🍕', '✈️', '🏠', '🏏', '🎉', '💼', '🎓', '🏖️', '🚗']
 
 export function GroupFormPage() {
   const { id } = useParams()
@@ -38,18 +46,28 @@ function GroupForm({ existing }: { existing: Group | null }) {
   const [kind, setKind] = useState<GroupKind>(existing?.kind ?? 'friends')
   const [toleranceText, setToleranceText] = useState(toRupeeInput(existing?.tolerance ?? 10000))
   const usesTolerance = kind === 'friends' || kind === 'office'
+  const [carpoolStyle, setCarpoolStyle] = useState<CarpoolStyle>(existing?.carpoolStyle ?? 'split')
+  const [carpoolAmountText, setCarpoolAmountText] = useState(existing?.carpoolAmount ? toRupeeInput(existing.carpoolAmount) : '')
   const [selected, setSelected] = useState<Set<string>>(new Set(existing?.memberIds ?? []))
   const [error, setError] = useState<string | null>(null)
+  const carpoolChanged = (group: Group | null) =>
+    kind === 'carpool' && (group?.carpoolStyle !== carpoolStyle || group?.carpoolAmount !== (parseRupees(carpoolAmountText) ?? null))
   const save = useLedgerMutation(async () => {
+    const carpoolAmount = parseRupees(carpoolAmountText)
+    if (kind === 'carpool' && carpoolStyle !== 'turns' && !carpoolAmount) {
+      throw new InputError(t(carpoolStyle === 'fare' ? 'Enter the fare per rider' : 'Enter the usual cost of a trip'))
+    }
     if (existing) {
       const added = [...selected].filter((m) => !existing.memberIds.includes(m))
       await api.updateGroup(existing.id, name.trim(), emoji, added)
       const tol = usesTolerance ? parseRupees(toleranceText) ?? 0 : 0
       if (kind !== existing.kind || tol !== existing.tolerance) await api.setGroupPrefs(existing.id, kind, tol, existing.kittyHolder)
+      if (carpoolChanged(existing)) await api.setCarpoolPrefs(existing.id, carpoolStyle, carpoolStyle === 'turns' ? null : carpoolAmount)
       return existing.id
     }
     const id = await api.createGroup(name.trim(), emoji, [...selected])
     if (kind !== 'friends') await api.setGroupPrefs(id, kind, usesTolerance ? 10000 : 0, null)
+    if (kind === 'carpool') await api.setCarpoolPrefs(id, carpoolStyle, carpoolStyle === 'turns' ? null : carpoolAmount)
     return id
   })
 
@@ -110,6 +128,27 @@ function GroupForm({ existing }: { existing: Group | null }) {
             </button>
           ))}
         </div>
+        {kind === 'carpool' ? (
+          <div className="space-y-2 rounded-2xl bg-white p-3 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+            <p className="text-sm font-medium">{t('How do you share costs?')}</p>
+            <div role="radiogroup" aria-label={t('How do you share costs?')} className="space-y-1.5">
+              {CARPOOL_STYLES.map((s) => (
+                <label key={s.value} className="flex items-start gap-3 rounded-xl p-2">
+                  <input type="radio" name="carpool-style" checked={carpoolStyle === s.value} onChange={() => setCarpoolStyle(s.value)} className="mt-1 h-5 w-5 accent-brand-700" />
+                  <span>
+                    <span className="block text-sm font-medium">{t(s.label)}</span>
+                    <span className="block text-xs text-slate-500 dark:text-slate-400">{t(s.hint)}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {CARPOOL_STYLES.find((s) => s.value === carpoolStyle)?.amountLabel ? (
+              <Field label={t(CARPOOL_STYLES.find((s) => s.value === carpoolStyle)!.amountLabel!)} hint={t('You can change it for any single trip.')}>
+                <TextInput inputMode="decimal" value={carpoolAmountText} onChange={(e) => setCarpoolAmountText(e.target.value)} placeholder={carpoolStyle === 'fare' ? '80' : '300'} />
+              </Field>
+            ) : null}
+          </div>
+        ) : null}
         {existing && usesTolerance ? (
           <Field label={t('Counts as even within (₹)')} hint={t('Small differences inside this amount show as “barabar”.')}>
             <TextInput inputMode="decimal" value={toleranceText} onChange={(e) => setToleranceText(e.target.value)} />

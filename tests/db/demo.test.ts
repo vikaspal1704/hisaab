@@ -52,6 +52,8 @@ describe('demo data', () => {
     expect(b.Kabir).toBe(150000) // owes you, for a month → reminder
     expect(b.Amit).toBe(-26300) // exact: you owe ₹263
     expect(b.Real).toBe(5000) // own data untouched
+    const rides = await db.as<{ n: number }>(me, `select count(*)::int as n from public.carpool_trips`)
+    expect(rides[0].n).toBeGreaterThanOrEqual(8)
 
     const nudgeable = await db.as<{ n: number }>(
       me,
@@ -63,6 +65,7 @@ describe('demo data', () => {
     expect(reviews.map((r) => r.description)).toEqual(expect.arrayContaining(['🚕 Uber pool', '🎤 Concert tickets', '🛒 DMart groceries']))
     const groups = await db.as<{ name: string; kind: string }>(me, 'select name, kind from public.groups order by name')
     expect(groups).toEqual([
+      { name: 'Car pool', kind: 'carpool' },
       { name: 'Flat 302', kind: 'home' },
       { name: 'Goa trip', kind: 'trip' },
       { name: 'Office chai', kind: 'office' },

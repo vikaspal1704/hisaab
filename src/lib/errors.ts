@@ -6,6 +6,11 @@ const MESSAGES: Record<string, string> = {
   phone_mismatch: 'Use the same number you signed in with.',
   phone_needs_invite:
     'A friend has already been keeping hisaab with this number. To link it to you, open the Hisaab link they sent you on WhatsApp (or ask them to tap “Invite” on your name), then sign in again.',
+  not_a_carpool: 'Set this group up as a car pool first (edit the group).',
+  invalid_trip: 'Pick a driver and at least one rider (the driver can’t also be a rider).',
+  trip_already_logged: 'That ride is already logged. Undo it first to change it.',
+  trip_not_found: 'That ride no longer exists, or only people in the car can undo it.',
+  carpool_amount_needed: 'Enter the fare or the trip cost.',
   invalid_items: 'Check the items: each needs a name, a price and at least one person.',
   cannot_add_self: 'That’s your own number.',
   unknown_person: 'Add this person as a friend first.',

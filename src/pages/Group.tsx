@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
+import { CarpoolCard } from '../components/CarpoolCard'
 import { IconEdit } from '../components/icons'
 import { BalanceLine } from '../components/Money'
 import { HeaderButton, Page } from '../components/Page'
@@ -64,7 +65,7 @@ export function GroupPage() {
       }
       footer={<ButtonLink to={`/add?group=${id}`} block className="mb-1">{t('Add a group expense')}</ButtonLink>}
     >
-      {turnMatters ? (
+      {group.kind === 'carpool' ? null : turnMatters ? (
         <div className="mt-2 rounded-2xl bg-amber-50 p-4 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-900">
           <p className="text-sm">⚖️ {group.kind === 'friends' ? t('Next baari') : t('Most behind')}</p>
           <p className="mt-1 text-lg font-semibold">
@@ -90,6 +91,7 @@ export function GroupPage() {
         />
       ) : null}
       {group.kind === 'trip' ? <KittyCard group={group} /> : null}
+      {group.kind === 'carpool' ? <CarpoolCard group={group} /> : null}
       {group.kind === 'home' || group.kind === 'office' ? <RecurringCard group={group} /> : null}
 
       <SectionTitle>{t('Balances in this group')}</SectionTitle>
