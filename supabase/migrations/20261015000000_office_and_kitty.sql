@@ -195,7 +195,15 @@ as $$
   where g.id = p_group and public.is_group_member(p_group)
 $$;
 
-revoke execute on all functions in schema public from public, anon;
+-- Only this file's functions: new functions are executable by everyone until revoked.
+revoke execute on function
+  public._next_occurrence(date, text, integer),
+  public._first_occurrence(date, text, integer),
+  public.save_recurring(uuid, uuid, text, bigint, text, jsonb, integer, date, text),
+  public.kitty_settlement(uuid),
+  public.close_kitty(uuid, text),
+  public.group_kitty(uuid)
+from public, anon;
 grant execute on function
   public.save_recurring(uuid, uuid, text, bigint, text, jsonb, integer, date, text),
   public.run_due_recurring(),
@@ -203,30 +211,3 @@ grant execute on function
   public.close_kitty(uuid, text),
   public.group_kitty(uuid)
 to authenticated;
--- Re-grant everything else clients use (the revoke above covers all functions).
-grant execute on function
-  public.me(), public.claim_profile(text, text, text), public.add_contact(text, text), public.add_contacts(jsonb),
-  public.set_nickname(uuid, text), public.my_people(), public.save_household(uuid, text, uuid[]),
-  public.delete_household(uuid), public.create_group(text, text, uuid[]), public.update_group(uuid, text, text, uuid[]),
-  public.save_expense(uuid, text, bigint, date, uuid, text, jsonb, integer),
-  public.save_payment(uuid, uuid, uuid, bigint, date, text, text, jsonb, uuid, integer),
-  public.delete_entry(uuid), public.restore_entry(uuid), public.my_balances(), public.person_ledger(uuid),
-  public.group_balances(uuid), public.my_activity(integer, bigint), public.is_entry_participant(uuid),
-  public.is_group_member(uuid), public.can_see_person(uuid),
-  public.set_contact_prefs(uuid, text, bigint, bigint, integer), public.mark_nudged(uuid),
-  public.set_group_prefs(uuid, text, bigint, uuid), public.forgive_balance(uuid, bigint, text),
-  public.save_treat(uuid, bigint, text, text, date, uuid[], uuid), public.treat_summary(uuid),
-  public.save_shortcut(text, text, bigint, uuid, jsonb), public.delete_shortcut(uuid),
-  public.react_to_entry(uuid, text, text), public.my_reviews(), public.create_share_link(uuid),
-  public.revoke_share_link(uuid), public.add_to_kitty(uuid, uuid, bigint, date, text),
-  public.save_kitty_expense(text, bigint, date, uuid, text, jsonb), public.stop_recurring(uuid),
-  public.save_push_subscription(text, text, text), public.delete_push_subscription(text)
-to authenticated;
-grant execute on function public.shared_view(text), public.shared_react(text, uuid, text, text) to anon, authenticated;
-do $$
-begin
-  if exists (select 1 from pg_roles where rolname = 'service_role') then
-    grant execute on function public.push_targets(bigint), public.digest_targets(), public.drop_push_subscription(text) to service_role;
-  end if;
-end;
-$$;
