@@ -1,0 +1,596 @@
+import { useQuery } from '@tanstack/react-query'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { Avatar, AvatarStack } from '../components/Avatar'
+import { IconPlus, IconX } from '../components/icons'
+import { Page } from '../components/Page'
+import { CheckRow, InlineAddFriend, SearchBox } from '../components/PeoplePicker'
+import { Sheet } from '../components/Sheet'
+import { useToast } from '../components/Toast'
+import { Button, Card, ErrorView, Field, inputClass, LoadingView, Segmented, SectionTitle } from '../components/ui'
+import { keys, useBalances, useEntry, useGroups, useHouseholds, useLedgerMutation, usePeople } from '../hooks/queries'
+import { api } from '../lib/api'
+import { friendlyError, InputError } from '../lib/errors'
+import { todayISO } from '../lib/format'
+import { formatINR, parseRupees, toRupeeInput, type Paise } from '../lib/money'
+import { whoPaysNext } from '../lib/settle'
+import { buildSplit, splitByWeights, type SplitMode, type SplitUnit } from '../lib/split'
+import type { EntryDetail, Group, Household } from '../lib/types'
+
+const QUICK = ['🍕 Food', '🍻 Drinks', '☕ Coffee', '🚕 Cab', '🎬 Movie', '🛒 Groceries', '✈️ Trip', '🏠 Rent']
+
+interface FormState {
+  amountText: string
+  description: string
+  date: string
+  groupId: string | null
+  units: SplitUnit[]
+  payerMode: 'one' | 'many'
+  payerId: string
+  payerAmounts: Record<string, string>
+  mode: SplitMode
+  values: Record<string, string>
+}
+
+const personUnit = (id: string): SplitUnit => ({ key: id, repId: id, memberIds: [id] })
+const householdUnit = (h: Household, meId: string): SplitUnit => {
+  const members = h.memberIds.filter((m) => m !== meId)
+  return { key: `h:${h.id}`, repId: members[0], memberIds: members }
+}
+
+export function ExpenseFormPage() {
+  const { id: entryId } = useParams()
+  const people = usePeople()
+  const households = useHouseholds()
+  const groups = useGroups()
+  const entry = useEntry(entryId)
+
+  const ready = people.me && !households.isPending && !groups.isPending && (!entryId || !entry.isPending)
+  if (!ready) return <Page title={entryId ? 'Edit expense' : 'Add expense'} back><LoadingView /></Page>
+  if (entryId && (!entry.data || entry.data.kind !== 'expense' || entry.data.deleted_at)) {
+    return <Page title="Edit expense" back><ErrorView message="This expense can’t be edited." /></Page>
+  }
+  return (
+    <ExpenseForm
+      meId={people.me!.id}
+      existing={entry.data ?? null}
+      households={households.data ?? []}
+      groups={groups.data ?? []}
+    />
+  )
+}
+
+function initialState(args: {
+  meId: string
+  existing: EntryDetail | null
+  households: Household[]
+  groups: Group[]
+  params: URLSearchParams
+}): FormState {
+  const { meId, existing, households, groups, params } = args
+  const base: FormState = {
+    amountText: '',
+    description: '',
+    date: todayISO(),
+    groupId: null,
+    units: [personUnit(meId)],
+    payerMode: 'one',
+    payerId: meId,
+    payerAmounts: {},
+    mode: 'equal',
+    values: {},
+  }
+
+  if (existing) {
+    const payers = existing.parts.filter((p) => p.paid > 0)
+    const consumers = existing.parts.filter((p) => p.owed > 0 || existing.split_mode === 'shares')
+    return {
+      ...base,
+      amountText: toRupeeInput(existing.amount),
+      description: existing.description,
+      date: existing.occurred_on,
+      groupId: existing.group_id,
+      units: consumers.map((p) => personUnit(p.person_id)),
+      payerMode: payers.length > 1 ? 'many' : 'one',
+      payerId: payers[0]?.person_id ?? meId,
+      payerAmounts: Object.fromEntries(payers.map((p) => [p.person_id, toRupeeInput(p.paid)])),
+      mode: existing.split_mode ?? 'exact',
+      values: Object.fromEntries(
+        consumers.map((p) => [p.person_id, existing.split_mode === 'shares' ? String(p.shares ?? 1) : toRupeeInput(p.owed)]),
+      ),
+    }
+  }
+
+  const units = [...base.units]
+  const add = (u: SplitUnit) => {
+    if (!units.some((x) => x.key === u.key || x.memberIds.some((m) => u.memberIds.includes(m)))) units.push(u)
+  }
+  const group = groups.find((g) => g.id === params.get('group'))
+  if (group) group.memberIds.filter((m) => m !== meId).forEach((m) => add(personUnit(m)))
+  const household = households.find((h) => h.id === params.get('household'))
+  if (household) add(householdUnit(household, meId))
+  for (const id of (params.get('with') ?? '').split(',').filter(Boolean)) add(personUnit(id))
+  return { ...base, groupId: group?.id ?? null, units }
+}
+
+function ExpenseForm({ meId, existing, households, groups }: { meId: string; existing: EntryDetail | null; households: Household[]; groups: Group[] }) {
+  const navigate = useNavigate()
+  const [params] = useSearchParams()
+  const toast = useToast()
+  const people = usePeople()
+  const balances = useBalances()
+  const [state, setState] = useState<FormState>(() => initialState({ meId, existing, households, groups, params }))
+  const [picking, setPicking] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const amountRef = useRef<HTMLInputElement>(null)
+  const set = (patch: Partial<FormState>) => setState((s) => ({ ...s, ...patch }))
+
+  useEffect(() => {
+    if (!existing) amountRef.current?.focus()
+  }, [existing])
+
+  const amount: Paise | null = parseRupees(state.amountText)
+  const group = groups.find((g) => g.id === state.groupId) ?? null
+  const unitLabel = (u: SplitUnit) =>
+    u.key.startsWith('h:') ? (households.find((h) => `h:${h.id}` === u.key)?.name ?? 'Pair') : people.name(u.repId)
+
+  const payerCandidates = useMemo(() => {
+    const ids = [meId, ...state.units.flatMap((u) => u.memberIds)]
+    return [...new Set(ids)]
+  }, [meId, state.units])
+
+  const payers = useMemo((): Record<string, Paise> => {
+    if (state.payerMode === 'one') return amount ? { [state.payerId]: amount } : {}
+    return Object.fromEntries(
+      Object.entries(state.payerAmounts)
+        .filter(([id]) => payerCandidates.includes(id))
+        .map(([id, text]) => [id, parseRupees(text) ?? 0]),
+    )
+  }, [state.payerMode, state.payerId, state.payerAmounts, amount, payerCandidates])
+
+  const split = useMemo(() => {
+    if (!amount) return { ok: false as const, error: 'Enter an amount' }
+    const values = Object.fromEntries(
+      state.units.map((u) => {
+        const raw = state.values[u.key] ?? ''
+        return [u.key, state.mode === 'exact' ? (parseRupees(raw) ?? 0) : Number(raw) || 0]
+      }),
+    )
+    return buildSplit({ amount, mode: state.mode, units: state.units, values, payers })
+  }, [amount, state.mode, state.units, state.values, payers])
+
+  const myPart = split.ok ? split.parts.find((p) => p.person_id === meId) : undefined
+  const myNet = myPart ? myPart.paid - myPart.owed : 0
+
+  const save = useLedgerMutation(async () => {
+    if (!split.ok || !amount) throw new InputError(split.ok ? 'Enter an amount' : split.error)
+    return api.saveExpense({
+      entryId: existing?.id ?? null,
+      description: state.description.trim() || 'Expense',
+      amount,
+      occurredOn: state.date,
+      groupId: state.groupId,
+      splitMode: state.mode,
+      parts: split.parts,
+      expectedVersion: existing?.version ?? null,
+    })
+  })
+
+  const submit = () => {
+    setSubmitted(true)
+    if (!split.ok) return
+    save.mutate(undefined, {
+      onSuccess: (id) => {
+        toast(existing ? 'Expense updated' : 'Expense added')
+        if (existing) navigate(-1)
+        else navigate(`/e/${id}`, { replace: true })
+      },
+    })
+  }
+
+  const setMode = (mode: SplitMode) => {
+    let values: Record<string, string> = {}
+    if (mode === 'shares') values = Object.fromEntries(state.units.map((u) => [u.key, String(u.memberIds.length)]))
+    if (mode === 'exact' && amount && state.units.length > 0) {
+      const parts = splitByWeights(amount, state.units.map((u) => u.memberIds.length))
+      values = Object.fromEntries(state.units.map((u, i) => [u.key, toRupeeInput(parts[i])]))
+    }
+    set({ mode, values })
+  }
+
+  const removeUnit = (key: string) => set({ units: state.units.filter((u) => u.key !== key) })
+
+  const toggleUnit = (unit: SplitUnit) => {
+    const exists = state.units.some((u) => u.key === unit.key)
+    const units = exists
+      ? state.units.filter((u) => u.key !== unit.key)
+      : [...state.units.filter((u) => !u.memberIds.some((m) => unit.memberIds.includes(m))), unit]
+    set({ units, values: { ...state.values, [unit.key]: state.mode === 'shares' ? String(unit.memberIds.length) : '' } })
+  }
+
+  const chooseGroup = (g: Group) => {
+    if (state.groupId === g.id) return set({ groupId: null })
+    const units = [personUnit(meId), ...g.memberIds.filter((m) => m !== meId).map(personUnit)]
+    set({ groupId: g.id, units, values: {} })
+  }
+
+  const mutationError = save.error ? friendlyError(save.error) : null
+  const formError = submitted && !split.ok ? split.error : mutationError
+
+  return (
+    <Page
+      title={existing ? 'Edit expense' : 'Add expense'}
+      back
+      footer={
+        <div className="pb-1">
+          {formError ? <p className="mb-2 text-center text-sm text-red-600 dark:text-red-400">{formError}</p> : null}
+          <Button block busy={save.isPending} onClick={submit}>
+            {split.ok
+              ? myNet > 0
+                ? `Save · you get back ${formatINR(myNet)}`
+                : myNet < 0
+                  ? `Save · your share ${formatINR(-myNet)}`
+                  : 'Save'
+              : 'Save'}
+          </Button>
+        </div>
+      }
+    >
+      {/* Amount */}
+      <label className="mt-2 flex items-center justify-center gap-1 rounded-3xl bg-white py-6 ring-1 ring-slate-200 focus-within:ring-2 focus-within:ring-brand-600 dark:bg-slate-900 dark:ring-slate-800">
+        <span className="text-3xl font-semibold text-slate-400">₹</span>
+        <input
+          ref={amountRef}
+          aria-label="Amount"
+          inputMode="decimal"
+          placeholder="0"
+          value={state.amountText}
+          onChange={(e) => set({ amountText: e.target.value.replace(/[^\d.,]/g, '') })}
+          style={{ width: `${Math.max(state.amountText.length, 1) + 0.5}ch` }}
+          className="max-w-[70vw] bg-transparent text-5xl font-bold tabular-nums outline-none placeholder:text-slate-300 dark:placeholder:text-slate-700"
+        />
+      </label>
+
+      {/* Description */}
+      <div className="mt-4">
+        <input
+          aria-label="What was it for?"
+          placeholder="What was it for?"
+          value={state.description}
+          maxLength={100}
+          onChange={(e) => set({ description: e.target.value })}
+          className={inputClass}
+        />
+        <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+          {QUICK.map((q) => (
+            <button
+              key={q}
+              type="button"
+              onClick={() => set({ description: q })}
+              className={`min-h-9 shrink-0 rounded-full px-3 text-sm ring-1 ${
+                state.description === q ? 'bg-brand-50 text-brand-800 ring-brand-600 dark:bg-brand-800/30 dark:text-brand-100' : 'bg-white ring-slate-200 dark:bg-slate-900 dark:ring-slate-700'
+              }`}
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Who */}
+      <SectionTitle
+        action={
+          <button type="button" onClick={() => setPicking(true)} className="flex min-h-9 items-center gap-1 text-sm font-semibold text-brand-700 dark:text-brand-500">
+            <IconPlus size={16} /> Add people
+          </button>
+        }
+      >
+        {group ? `${group.emoji ?? '👥'} ${group.name}` : 'Split between'}
+      </SectionTitle>
+      <TurnHint
+        meId={meId}
+        groupId={state.groupId}
+        units={state.units}
+        balanceOf={balances.net}
+        name={people.name}
+        onPick={(id) => set({ payerMode: 'one', payerId: id })}
+        payerId={state.payerMode === 'one' ? state.payerId : null}
+      />
+      <Card className="divide-y divide-slate-100 dark:divide-slate-800">
+        {state.units.length === 0 ? (
+          <button type="button" onClick={() => setPicking(true)} className="w-full p-4 text-left text-slate-500">Tap “Add people” to choose who shared this.</button>
+        ) : null}
+        {state.units.map((u) => {
+          const owed = split.ok ? split.owedByUnit[u.key] : undefined
+          return (
+            <div key={u.key} className="flex min-h-14 items-center gap-3 px-3 py-2">
+              {u.memberIds.length > 1 ? (
+                <AvatarStack people={u.memberIds.map((m) => ({ id: m, name: people.name(m) }))} size={36} />
+              ) : (
+                <Avatar id={u.repId} name={people.name(u.repId, { you: false })} size={36} />
+              )}
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{unitLabel(u)}</span>
+                {u.memberIds.length > 1 ? <span className="block text-xs text-slate-500">counted as one · {u.memberIds.length} shares</span> : null}
+              </span>
+              {state.mode === 'equal' ? (
+                <span className="text-sm font-semibold tabular-nums">{owed !== undefined ? formatINR(owed) : '—'}</span>
+              ) : (
+                <span className="flex items-center gap-2">
+                  {state.mode === 'shares' && owed !== undefined ? <span className="text-xs text-slate-500 tabular-nums">{formatINR(owed)}</span> : null}
+                  <input
+                    aria-label={`${state.mode === 'exact' ? 'Amount' : 'Shares'} for ${unitLabel(u)}`}
+                    inputMode="decimal"
+                    value={state.values[u.key] ?? ''}
+                    onChange={(e) => set({ values: { ...state.values, [u.key]: e.target.value } })}
+                    placeholder={state.mode === 'exact' ? '₹0' : '1'}
+                    className="h-10 w-20 rounded-lg bg-slate-100 px-2 text-right tabular-nums outline-none focus:ring-2 focus:ring-brand-600 dark:bg-slate-800"
+                  />
+                </span>
+              )}
+              <button type="button" aria-label={`Remove ${unitLabel(u)}`} onClick={() => removeUnit(u.key)} className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 active:bg-slate-100 dark:active:bg-slate-800">
+                <IconX size={18} />
+              </button>
+            </div>
+          )
+        })}
+      </Card>
+      <div className="mt-3">
+        <Segmented
+          label="How to split"
+          value={state.mode}
+          onChange={setMode}
+          options={[
+            { value: 'equal', label: 'Equally' },
+            { value: 'exact', label: 'Amounts' },
+            { value: 'shares', label: 'Shares' },
+          ]}
+        />
+        {state.mode === 'exact' && amount ? <ExactRemaining amount={amount} units={state.units} values={state.values} /> : null}
+      </div>
+
+      {/* Paid by */}
+      <SectionTitle>Paid by</SectionTitle>
+      <div className="flex flex-wrap gap-2">
+        {payerCandidates.map((id) => {
+          const active = state.payerMode === 'one' && state.payerId === id
+          return (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={active}
+              onClick={() => set({ payerMode: 'one', payerId: id })}
+              className={`flex min-h-10 items-center gap-2 rounded-full py-1 pr-3 pl-1 text-sm font-medium ring-1 ${
+                active ? 'bg-brand-700 text-white ring-brand-700' : 'bg-white ring-slate-200 dark:bg-slate-900 dark:ring-slate-700'
+              }`}
+            >
+              <Avatar id={id} name={people.name(id, { you: false })} size={28} />
+              {people.name(id)}
+            </button>
+          )
+        })}
+        <button
+          type="button"
+          aria-pressed={state.payerMode === 'many'}
+          onClick={() => set({ payerMode: 'many' })}
+          className={`min-h-10 rounded-full px-3 text-sm font-medium ring-1 ${
+            state.payerMode === 'many' ? 'bg-brand-700 text-white ring-brand-700' : 'bg-white ring-slate-200 dark:bg-slate-900 dark:ring-slate-700'
+          }`}
+        >
+          Several people
+        </button>
+      </div>
+      {state.payerMode === 'many' ? (
+        <Card className="mt-3 divide-y divide-slate-100 dark:divide-slate-800">
+          {payerCandidates.map((id) => (
+            <div key={id} className="flex min-h-14 items-center gap-3 px-3">
+              <Avatar id={id} name={people.name(id, { you: false })} size={32} />
+              <span className="flex-1 font-medium">{people.name(id)}</span>
+              <input
+                aria-label={`Paid by ${people.name(id)}`}
+                inputMode="decimal"
+                placeholder="₹0"
+                value={state.payerAmounts[id] ?? ''}
+                onChange={(e) => set({ payerAmounts: { ...state.payerAmounts, [id]: e.target.value } })}
+                className="h-10 w-24 rounded-lg bg-slate-100 px-2 text-right tabular-nums outline-none focus:ring-2 focus:ring-brand-600 dark:bg-slate-800"
+              />
+            </div>
+          ))}
+        </Card>
+      ) : null}
+
+      {/* Date */}
+      <div className="mt-6">
+        <Field label="Date">
+          <input type="date" value={state.date} max={todayISO()} onChange={(e) => set({ date: e.target.value || todayISO() })} className={inputClass} />
+        </Field>
+      </div>
+
+      <ParticipantSheet
+        open={picking}
+        onClose={() => setPicking(false)}
+        meId={meId}
+        units={state.units}
+        groupId={state.groupId}
+        groups={groups}
+        canChangeGroup={!existing}
+        households={households}
+        onToggle={toggleUnit}
+        onGroup={chooseGroup}
+      />
+    </Page>
+  )
+}
+
+function ExactRemaining({ amount, units, values }: { amount: Paise; units: SplitUnit[]; values: Record<string, string> }) {
+  const assigned = units.reduce((s, u) => s + (parseRupees(values[u.key] ?? '') ?? 0), 0)
+  const left = amount - assigned
+  if (left === 0) return <p className="mt-2 text-sm text-owed">✓ Adds up to {formatINR(amount)}</p>
+  return (
+    <p className="mt-2 text-sm text-owe">
+      {left > 0 ? `${formatINR(left)} left to assign` : `${formatINR(-left)} too much`}
+    </p>
+  )
+}
+
+/**
+ * Nudges toward "take turns": in a group, whoever is furthest behind there;
+ * otherwise based on my own balances with the people on this bill.
+ */
+function TurnHint({
+  meId,
+  groupId,
+  units,
+  balanceOf,
+  name,
+  onPick,
+  payerId,
+}: {
+  meId: string
+  groupId: string | null
+  units: SplitUnit[]
+  balanceOf: (id: string) => Paise
+  name: (id: string) => string
+  onPick: (id: string) => void
+  payerId: string | null
+}) {
+  const groupBalances = useQuery({
+    queryKey: keys.groupBalances(groupId ?? ''),
+    queryFn: () => api.groupBalances(groupId!),
+    enabled: Boolean(groupId),
+  })
+  const others = units.flatMap((u) => u.memberIds).filter((id) => id !== meId)
+  if (others.length === 0) return null
+
+  let suggestion: { personId: string; text: string } | null = null
+  if (groupId && groupBalances.data) {
+    const involved = new Set([meId, ...others])
+    const nets = Object.fromEntries(groupBalances.data.filter((b) => involved.has(b.person_id)).map((b) => [b.person_id, b.net]))
+    const turn = whoPaysNext(nets)
+    if (turn) {
+      suggestion = {
+        personId: turn.personId,
+        text: turn.personId === meId ? `You’re behind by ${formatINR(turn.behindBy)} in this group — your turn to pay?` : `${name(turn.personId)} is behind by ${formatINR(turn.behindBy)} in this group — their turn?`,
+      }
+    }
+  } else if (!groupId) {
+    const total = others.reduce((s, id) => s + balanceOf(id), 0)
+    const topDebtor = [...others].sort((a, b) => balanceOf(b) - balanceOf(a))[0]
+    if (total < 0) {
+      const who = others.length === 1 ? name(others[0]) : 'these friends'
+      suggestion = { personId: meId, text: `You owe ${who} ${formatINR(-total)} — your turn to pay. This bill evens things out.` }
+    } else if (balanceOf(topDebtor) > 0) {
+      suggestion = { personId: topDebtor, text: `${name(topDebtor)} owes you ${formatINR(balanceOf(topDebtor))} — their turn to pay?` }
+    }
+  }
+  if (!suggestion) return null
+  const chosen = payerId === suggestion.personId
+  return (
+    <div className="mb-3 flex items-center gap-3 rounded-2xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-900">
+      <span aria-hidden className="text-lg">⚖️</span>
+      <span className="flex-1">{suggestion.text}</span>
+      {chosen ? (
+        <span className="text-xs font-semibold">✓ Set</span>
+      ) : (
+        <button type="button" onClick={() => onPick(suggestion.personId)} className="min-h-9 shrink-0 rounded-full bg-amber-200/70 px-3 font-semibold dark:bg-amber-800/60">
+          {suggestion.personId === meId ? 'I’ll pay' : `${name(suggestion.personId)} pays`}
+        </button>
+      )}
+    </div>
+  )
+}
+
+function ParticipantSheet({
+  open,
+  onClose,
+  meId,
+  units,
+  groupId,
+  groups,
+  households,
+  onToggle,
+  onGroup,
+  canChangeGroup,
+}: {
+  canChangeGroup: boolean
+  open: boolean
+  onClose: () => void
+  meId: string
+  units: SplitUnit[]
+  groupId: string | null
+  groups: Group[]
+  households: Household[]
+  onToggle: (u: SplitUnit) => void
+  onGroup: (g: Group) => void
+}) {
+  const people = usePeople()
+  const [query, setQuery] = useState('')
+  const q = query.trim().toLowerCase()
+  const group = groups.find((g) => g.id === groupId)
+  const selected = new Set(units.map((u) => u.key))
+  const allowed = (id: string) => !group || group.memberIds.includes(id)
+
+  const friends = people.list
+    .filter((p) => (p.is_contact || p.is_me) && allowed(p.id))
+    .filter((p) => !q || p.display_name.toLowerCase().includes(q) || p.phone.includes(q))
+    .sort((a, b) => Number(b.is_me) - Number(a.is_me) || a.display_name.localeCompare(b.display_name))
+  const pairs = households
+    .map((h) => ({ h, unit: householdUnit(h, meId) }))
+    .filter(({ unit }) => unit.memberIds.length > 0 && unit.memberIds.every(allowed))
+    .filter(({ h }) => !q || h.name.toLowerCase().includes(q))
+  const groupMatches = canChangeGroup ? groups.filter((g) => !q || g.name.toLowerCase().includes(q)) : []
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Who shared this?">
+      <div className="space-y-4">
+        <SearchBox value={query} onChange={setQuery} />
+        {groupMatches.length > 0 ? (
+          <section>
+            <h3 className="mb-1 text-xs font-semibold text-slate-500 uppercase">Groups</h3>
+            {groupMatches.map((g) => (
+              <CheckRow
+                key={g.id}
+                checked={groupId === g.id}
+                onClick={() => onGroup(g)}
+                id={g.id}
+                name={g.name}
+                subtitle={`${g.memberIds.length} people`}
+                leading={<span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-lg dark:bg-slate-800">{g.emoji ?? '👥'}</span>}
+              />
+            ))}
+          </section>
+        ) : null}
+        {pairs.length > 0 ? (
+          <section>
+            <h3 className="mb-1 text-xs font-semibold text-slate-500 uppercase">Pairs · counted as one</h3>
+            {pairs.map(({ h, unit }) => (
+              <CheckRow
+                key={h.id}
+                checked={selected.has(unit.key)}
+                onClick={() => onToggle(unit)}
+                id={h.id}
+                name={h.name}
+                subtitle={unit.memberIds.map((m) => people.name(m)).join(' · ')}
+                leading={<AvatarStack people={unit.memberIds.map((m) => ({ id: m, name: people.name(m) }))} size={36} />}
+              />
+            ))}
+          </section>
+        ) : null}
+        <section>
+          <h3 className="mb-1 text-xs font-semibold text-slate-500 uppercase">{group ? `People in ${group.name}` : 'Friends'}</h3>
+          {friends.map((p) => (
+            <CheckRow
+              key={p.id}
+              checked={selected.has(p.id)}
+              onClick={() => onToggle(personUnit(p.id))}
+              id={p.id}
+              name={p.is_me ? 'You' : p.display_name}
+            />
+          ))}
+        </section>
+        {group ? null : <InlineAddFriend onAdded={(id) => onToggle(personUnit(id))} initialName={friends.length === 0 ? query : ''} />}
+        <Button block onClick={onClose}>Done</Button>
+      </div>
+    </Sheet>
+  )
+}
