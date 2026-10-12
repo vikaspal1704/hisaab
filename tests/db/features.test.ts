@@ -285,3 +285,53 @@ describe('bulk contact import', () => {
     ).rejects.toThrow(/too_many_contacts/)
   })
 })
+
+describe('office crews and repeats', () => {
+  it('posts weekday repeats on weekdays only and catches up at most a month', async () => {
+    const [a, b] = await friends('Wa', 'Wb')
+    const group = await makeGroup(a, [b])
+    await db.as(a, `select public.set_group_prefs($1, 'office', 10000, null)`, [group])
+    const parts = [
+      { person_id: a.personId, paid: 4000, owed: 2000 },
+      { person_id: b.personId, paid: 0, owed: 2000 },
+    ]
+    // Started two weeks ago: 10 weekdays are due (today included if it's a weekday).
+    await db.as(a, `select public.save_recurring(null, $1, 'Snacks', 4000, 'equal', $2::jsonb, 1, current_date - 13, 'weekdays')`, [
+      group,
+      JSON.stringify(parts),
+    ])
+    const [{ n }] = await db.as<{ n: number }>(a, 'select public.run_due_recurring() as n')
+    const [{ expected }] = await db.admin<{ expected: number }>(
+      `select count(*)::int as expected from generate_series(current_date - 13, current_date, '1 day') d where extract(isodow from d) < 6`,
+    )
+    expect(n).toBe(expected)
+    const weekend = await db.admin(`select 1 from public.entries where description like 'Snacks%' and extract(isodow from occurred_on) >= 6`)
+    expect(weekend).toEqual([])
+    const [{ next_on }] = await db.admin<{ next_on: Date }>(`select next_on from public.recurring_rules where description = 'Snacks'`)
+    expect([1, 2, 3, 4, 5]).toContain(next_on.getDay() === 0 ? 7 : next_on.getDay())
+  })
+})
+
+describe('closing a kitty', () => {
+  it('returns leftovers to each member and zeroes the kitty', async () => {
+    const [a, b, c] = await friends('Ca', 'Cb', 'Cc')
+    const group = await makeGroup(a, [b, c])
+    await db.as(a, `select public.set_group_prefs($1, 'trip', 0, $2)`, [group, a.personId])
+    await db.as(a, `select public.add_to_kitty($1, $2, 200000, current_date, 'upi')`, [group, b.personId])
+    await db.as(a, `select public.add_to_kitty($1, $2, 100000, current_date, 'upi')`, [group, c.personId])
+    const parts = [a, b, c].map((u) => ({ person_id: u.personId, paid: u === a ? 150000 : 0, owed: 50000 }))
+    await db.as(a, `select public.save_kitty_expense('Dinner', 150000, current_date, $1, 'equal', $2::jsonb)`, [group, JSON.stringify(parts)])
+
+    const settle = await db.as<{ person_id: string; amount: string }>(a, 'select * from public.kitty_settlement($1)', [group])
+    const byId = Object.fromEntries(settle.map((s) => [s.person_id, Number(s.amount)]))
+    expect(byId).toEqual({ [b.personId]: 150000, [c.personId]: 50000 })
+
+    await expect(db.as(b, `select public.close_kitty($1, 'cash')`, [group])).rejects.toThrow(/only_kitty_holder/)
+    const [{ n }] = await db.as<{ n: number }>(a, `select public.close_kitty($1, 'upi') as n`, [group])
+    expect(n).toBe(2)
+    expect(await net(b, a)).toBe(0)
+    expect(await net(c, a)).toBe(0)
+    const [g] = await db.admin<{ kitty_holder: string | null }>('select kitty_holder from public.groups where id = $1', [group])
+    expect(g.kitty_holder).toBeNull()
+  })
+})

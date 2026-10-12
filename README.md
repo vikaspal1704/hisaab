@@ -47,8 +47,11 @@ another app, and asking for money back is awkward.
   it, the balance shows "barabar 👍" and nobody is chased for ₹37.
 - **Chhod do 🙏.** Let go of what someone owes you. It's recorded as a gift, so the passbook
   stays honest.
-- **Two-tap logging.** "Add again" on any entry, shortcuts for regular outings on the home
-  screen, and the split options stay folded away when it's just "split equally, I paid".
+- **One-line quick add.** On the home screen, type "450 chai", tap who it was with, done. It's
+  split equally and paid by you, with an Undo. There's also "Add again" on any entry, shortcuts
+  for regular outings, and the split options stay folded away for the common case.
+- **Next baari, both ways.** The home screen lists whose turn it is: "Amit's baari ₹300",
+  "Your baari with Rahul ₹195".
 - **Log straight from UPI.** Paste the GPay, PhonePe, Paytm or bank SMS message and Hisaab
   fills in the amount and the friend. On Android, the installed app also appears in the
   Share menu, so you can share a payment message straight to it.
@@ -64,7 +67,14 @@ another app, and asking for money back is awkward.
   owed: "Rahul gave the last treat — next one's on you?"
 - **Trip kitty.** Everyone puts money in with one person, and spends come out of the kitty.
   Hisaab tracks collected versus spent and what each person is owed back.
-- **Flatmates.** Rent, WiFi, cook or Netflix are added automatically every month, split equally.
+- **Office crew.** A group type for daily chai and snacks. The group page has a "Today" card:
+  last time's amount and items are filled in, you tap anyone who's away, and whoever's baari it
+  is pays. Small differences count as even.
+- **Repeating expenses.** Monthly (rent, WiFi, cook, Netflix), every weekday (a snacks box) or
+  daily. They're split equally and added when a member opens the app; anything missed is
+  caught up for up to a month.
+- **Close the kitty.** At the end of a trip, the holder sees what to return to each person
+  (or collect) and closes the kitty in one go.
 - **Notifications.** A push when a friend adds or changes something with you, plus a short
   weekly summary (optional setup, below). Without it, changes still appear live, with an
   unread badge.
@@ -102,7 +112,8 @@ You need a GitHub account, a Supabase account (free) and a Google Cloud account 
 2. Open **SQL Editor** → **New query**, paste the whole contents of
    `supabase/migrations/20261012000000_init.sql`, and click **Run**. Then do the same with
    `supabase/migrations/20261013000000_friendship_features.sql`, then
-   `supabase/migrations/20261014000000_bulk_contacts.sql`, in that order. If a file says
+   `supabase/migrations/20261014000000_bulk_contacts.sql`, then
+   `supabase/migrations/20261015000000_office_and_kitty.sql`, in that order. If a file says
    something "already exists", it was run before: skip it and run the next one.
 3. Open **Project Settings → API** and note the **Project URL** and the **anon / publishable
    key**. Both are meant to be public; Row Level Security protects the data.
@@ -212,6 +223,6 @@ tests/db/              integration tests for the SQL (balances, payments, RLS, a
   "Paste the message" with the bank SMS or the text from the payment screen.
 - Web apps can't read the phone book in the background on any phone, so contacts can't sync
   automatically. Use the contact picker (Android Chrome) or re-import a contacts file.
-- Monthly bills are posted when a member opens the app on or after the due day.
+- Repeating expenses are posted when a member opens the app on or after the due day.
 - Anyone holding a share link can see that one passbook until you turn the link off.
 - Not done yet: receipt photos, CSV export, and multiple currencies.

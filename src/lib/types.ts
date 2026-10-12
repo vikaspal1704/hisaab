@@ -28,7 +28,7 @@ export interface Household {
   memberIds: string[]
 }
 
-export type GroupKind = 'friends' | 'trip' | 'home'
+export type GroupKind = 'friends' | 'trip' | 'home' | 'office'
 
 export interface Group {
   id: string
@@ -96,6 +96,7 @@ export interface RecurringRule {
   split_mode: SplitMode
   parts: EntryPart[]
   day_of_month: number
+  frequency: 'monthly' | 'weekdays' | 'daily'
   next_on: string
   active: boolean
 }

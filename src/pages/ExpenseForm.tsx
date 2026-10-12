@@ -156,7 +156,14 @@ function initialState(args: {
   const household = households.find((h) => h.id === params.get('household'))
   if (household) add(householdUnit(household, meId))
   for (const id of (params.get('with') ?? '').split(',').filter(Boolean)) add(personUnit(id))
-  const state = { ...base, groupId: group?.id ?? null, units }
+  const quickAmount = Number(params.get('amount'))
+  const state = {
+    ...base,
+    groupId: group?.id ?? null,
+    units,
+    amountText: Number.isInteger(quickAmount) && quickAmount > 0 ? toRupeeInput(quickAmount) : '',
+    description: params.get('desc') ?? '',
+  }
   const pasted = params.get('paste')
   return pasted && pasted !== '1' ? applyPaste(state, pasted, people) : state
 }

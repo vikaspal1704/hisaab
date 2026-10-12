@@ -333,7 +333,7 @@ export const api = {
   async recurring(groupId: string): Promise<RecurringRule[]> {
     const { data, error } = await supabase
       .from('recurring_rules')
-      .select('id, group_id, description, amount, split_mode, parts, day_of_month, next_on, active')
+      .select('id, group_id, description, amount, split_mode, parts, day_of_month, frequency, next_on, active')
       .eq('group_id', groupId)
       .eq('active', true)
       .order('day_of_month')
@@ -341,7 +341,16 @@ export const api = {
     return data.map((r) => ({ ...r, amount: num(r.amount) })) as RecurringRule[]
   },
 
-  saveRecurring(args: { groupId: string; description: string; amount: Paise; splitMode: SplitMode; parts: EntryPart[]; dayOfMonth: number; startOn: string }) {
+  saveRecurring(args: {
+    groupId: string
+    description: string
+    amount: Paise
+    splitMode: SplitMode
+    parts: EntryPart[]
+    dayOfMonth: number
+    startOn: string
+    frequency: RecurringRule['frequency']
+  }) {
     return rpc<string>('save_recurring', {
       p_id: null,
       p_group: args.groupId,
@@ -351,7 +360,17 @@ export const api = {
       p_parts: args.parts,
       p_day_of_month: args.dayOfMonth,
       p_start_on: args.startOn,
+      p_frequency: args.frequency,
     })
+  },
+
+  async kittySettlement(groupId: string): Promise<{ person_id: string; amount: Paise }[]> {
+    const rows = await rpc<{ person_id: string; amount: Paise }[]>('kitty_settlement', { p_group: groupId })
+    return rows.map((r) => ({ ...r, amount: num(r.amount) }))
+  },
+
+  closeKitty(groupId: string, method: PaymentMethod) {
+    return rpc<number>('close_kitty', { p_group: groupId, p_method: method })
   },
 
   stopRecurring(id: string) {

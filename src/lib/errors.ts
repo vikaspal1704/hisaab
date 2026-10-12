@@ -19,6 +19,7 @@ const MESSAGES: Record<string, string> = {
   household_size: 'A pair needs 2 to 6 people.',
   already_in_household: 'Someone here is already in another pair.',
   household_not_found: 'Pair not found.',
+  only_kitty_holder: 'Only the kitty holder can close it.',
   too_many_contacts: 'You can import up to 500 contacts at a time.',
   forgive_too_much: 'You can only let go of what they owe you.',
   link_not_found: 'This link isn’t active any more.',

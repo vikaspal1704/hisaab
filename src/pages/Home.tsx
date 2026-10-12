@@ -5,6 +5,7 @@ import { LentSheet, NudgeSheet } from '../components/FriendSheets'
 import { IconUserPlus } from '../components/icons'
 import { StyledBalance } from '../components/Money'
 import { HeaderButton, Page } from '../components/Page'
+import { QuickAdd } from '../components/QuickAdd'
 import { ReviewCard } from '../components/Review'
 import { ButtonLink, Card, EmptyState, ErrorView, LoadingView, Row, SectionTitle } from '../components/ui'
 import { useBalances, useContactPrefs, useHouseholds, usePeople, useReviews, useShortcuts } from '../hooks/queries'
@@ -80,7 +81,10 @@ export function HomePage() {
       else iOwe -= b.net
     }
     // My baari: people I'm behind with, beyond what counts as even.
-    const nextBaari = rows.filter((r) => r.style === 'baari' && relationState(r.net, r.tolerance).kind === 'i_owe')
+    // Whose turn it is, both ways: people I'm behind with, and people behind with me.
+    const nextBaari = rows
+      .filter((r) => r.style === 'baari' && relationState(r.net, r.tolerance).kind !== 'even')
+      .sort((a, b) => Math.abs(b.net) - Math.abs(a.net))
     const nudges = (balances.data ?? [])
       .filter((b) => shouldNudge(b.net, b.last_activity, prefs.prefs(b.person_id)))
       .map((b) => ({ id: b.person_id, amount: b.net }))
@@ -109,7 +113,9 @@ export function HomePage() {
         <ErrorView message={friendlyError(error)} onRetry={() => { people.refetch(); balances.refetch(); households.refetch() }} />
       ) : (
         <>
-          <Summary owedToMe={owedToMe} iOwe={iOwe} nextBaari={nextBaari.map((r) => r.title)} />
+          <Summary owedToMe={owedToMe} iOwe={iOwe} />
+          <QuickAdd />
+          <BaariCard rows={nextBaari} />
           <QuickActions shortcuts={shortcuts.data ?? []} hasFriends={rows.length > 0} onLent={() => setLending(true)} />
 
           <ReviewCard rows={reviews.data ?? []} />
@@ -188,7 +194,7 @@ function QuickActions({ shortcuts, hasFriends, onLent }: { shortcuts: { id: stri
   if (!hasFriends) return null
   const chip = 'flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-white px-3.5 text-sm font-medium ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700'
   return (
-    <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]" aria-label={t('Quick add')}>
+    <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]" aria-label={t('Shortcuts')}>
       {shortcuts.map((s) => (
         <Link key={s.id} to={`/add?shortcut=${s.id}`} className={chip}>
           ⚡ {s.label}
@@ -201,7 +207,30 @@ function QuickActions({ shortcuts, hasFriends, onLent }: { shortcuts: { id: stri
   )
 }
 
-function Summary({ owedToMe, iOwe, nextBaari }: { owedToMe: Paise; iOwe: Paise; nextBaari: string[] }) {
+function BaariCard({ rows }: { rows: DashboardRow[] }) {
+  const { t } = useT()
+  if (rows.length === 0) return null
+  return (
+    <>
+      <SectionTitle>{t('Next baari')}</SectionTitle>
+      <Card className="divide-y divide-slate-100 overflow-hidden dark:divide-slate-800">
+        {rows.slice(0, 4).map((r) => (
+          <Link key={r.key} to={r.to} className="flex min-h-12 items-center gap-3 px-4 py-2 text-sm">
+            <span aria-hidden>⚖️</span>
+            <span className="flex-1">
+              {r.net < 0 ? t('Your baari with {name}', { name: r.title }) : t('{name}’s baari', { name: r.title })}
+            </span>
+            <span className={`font-semibold tabular-nums ${r.net < 0 ? 'text-owe dark:text-owe-dark' : 'text-owed dark:text-owed-dark'}`}>
+              {formatINR(Math.abs(r.net))}
+            </span>
+          </Link>
+        ))}
+      </Card>
+    </>
+  )
+}
+
+function Summary({ owedToMe, iOwe }: { owedToMe: Paise; iOwe: Paise }) {
   const { t } = useT()
   const net = owedToMe - iOwe
   const headline =
@@ -223,11 +252,6 @@ function Summary({ owedToMe, iOwe, nextBaari }: { owedToMe: Paise; iOwe: Paise; 
           <p className="mt-0.5 text-xl font-bold tabular-nums">{formatINR(iOwe)}</p>
         </div>
       </div>
-      {nextBaari.length > 0 ? (
-        <p className="mt-3 text-sm text-brand-100">
-          {t('Your baari next with {names} — pick up the next bill and it evens out.', { names: nextBaari.slice(0, 3).join(', ') })}
-        </p>
-      ) : null}
     </div>
   )
 }

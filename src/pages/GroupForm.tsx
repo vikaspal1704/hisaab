@@ -7,6 +7,7 @@ import { Button, ErrorView, Field, LoadingView, SectionTitle, TextInput } from '
 import { useGroups, useLedgerMutation } from '../hooks/queries'
 import { api } from '../lib/api'
 import { friendlyError } from '../lib/errors'
+import { parseRupees, toRupeeInput } from '../lib/money'
 import { useT } from '../lib/i18n'
 import type { Group, GroupKind } from '../lib/types'
 
@@ -14,6 +15,7 @@ const KINDS: { value: GroupKind; label: string; hint: string; emoji: string }[] 
   { value: 'friends', label: 'Friends hangout', hint: 'Take turns paying. Small differences count as even.', emoji: '🍻' },
   { value: 'trip', label: 'Trip', hint: 'Exact splits, and an optional kitty everyone chips into.', emoji: '✈️' },
   { value: 'home', label: 'Flat / home', hint: 'Exact splits, plus monthly bills like rent and WiFi.', emoji: '🏠' },
+  { value: 'office', label: 'Office crew', hint: 'Daily chai and snacks in one tap. Take turns; small differences count as even.', emoji: '☕' },
 ]
 
 const EMOJIS = ['👥', '🍻', '🍕', '✈️', '🏠', '🏏', '🎉', '💼', '🎓', '🏖️']
@@ -34,17 +36,20 @@ function GroupForm({ existing }: { existing: Group | null }) {
   const { t } = useT()
   const [emoji, setEmoji] = useState(existing?.emoji ?? '🍻')
   const [kind, setKind] = useState<GroupKind>(existing?.kind ?? 'friends')
+  const [toleranceText, setToleranceText] = useState(toRupeeInput(existing?.tolerance ?? 10000))
+  const usesTolerance = kind === 'friends' || kind === 'office'
   const [selected, setSelected] = useState<Set<string>>(new Set(existing?.memberIds ?? []))
   const [error, setError] = useState<string | null>(null)
   const save = useLedgerMutation(async () => {
     if (existing) {
       const added = [...selected].filter((m) => !existing.memberIds.includes(m))
       await api.updateGroup(existing.id, name.trim(), emoji, added)
-      if (kind !== existing.kind) await api.setGroupPrefs(existing.id, kind, kind === 'friends' ? 10000 : 0, existing.kittyHolder)
+      const tol = usesTolerance ? parseRupees(toleranceText) ?? 0 : 0
+      if (kind !== existing.kind || tol !== existing.tolerance) await api.setGroupPrefs(existing.id, kind, tol, existing.kittyHolder)
       return existing.id
     }
     const id = await api.createGroup(name.trim(), emoji, [...selected])
-    if (kind !== 'friends') await api.setGroupPrefs(id, kind, 0, null)
+    if (kind !== 'friends') await api.setGroupPrefs(id, kind, usesTolerance ? 10000 : 0, null)
     return id
   })
 
@@ -105,6 +110,11 @@ function GroupForm({ existing }: { existing: Group | null }) {
             </button>
           ))}
         </div>
+        {existing && usesTolerance ? (
+          <Field label={t('Counts as even within (₹)')} hint={t('Small differences inside this amount show as “barabar”.')}>
+            <TextInput inputMode="decimal" value={toleranceText} onChange={(e) => setToleranceText(e.target.value)} />
+          </Field>
+        ) : null}
         <div className="flex gap-2 overflow-x-auto pb-1" role="radiogroup" aria-label={t('Icon')}>
           {EMOJIS.map((e) => (
             <button
