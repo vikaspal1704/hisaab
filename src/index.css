@@ -1,17 +1,30 @@
 @import "tailwindcss";
+@import "@fontsource-variable/inter";
 
 @theme {
-  --color-brand-50: #f0fdfa;
-  --color-brand-100: #ccfbf1;
-  --color-brand-500: #14b8a6;
-  --color-brand-600: #0d9488;
-  --color-brand-700: #0f766e;
-  --color-brand-800: #115e59;
-  --color-owed: #059669;
+  /* Brand: a deep, calm teal. 700 is the action colour (AA on white). */
+  --color-brand-50: #effcf9;
+  --color-brand-100: #cbf5ec;
+  --color-brand-200: #98ead9;
+  --color-brand-300: #5ed6c1;
+  --color-brand-400: #2fbca6;
+  --color-brand-500: #16a08c;
+  --color-brand-600: #0e8273;
+  --color-brand-700: #0f685d;
+  --color-brand-800: #11534c;
+  --color-brand-900: #12443f;
+  --color-brand-950: #042825;
+  /* Money state only: green = coming to you, orange = you owe. */
+  --color-owed: #047857;
   --color-owed-dark: #34d399;
-  --color-owe: #ea580c;
+  --color-owe: #c2410c;
   --color-owe-dark: #fb923c;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  /* App canvas behind the cards. */
+  --color-canvas: #f5f6f8;
+  --color-canvas-dark: #0b0f17;
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 1px rgb(15 23 42 / 0.03);
+  --shadow-raised: 0 8px 24px -8px rgb(15 23 42 / 0.12), 0 2px 6px -2px rgb(15 23 42 / 0.06);
 }
 
 :root {
@@ -21,8 +34,31 @@
 
 html,
 body {
-  @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+  @apply bg-canvas text-slate-900 antialiased dark:bg-canvas-dark dark:text-slate-100;
   overscroll-behavior-y: none;
+  font-feature-settings: "cv11", "ss01";
+}
+
+/* Amounts line up in columns. */
+.tabular-nums,
+.money {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Keyboard focus is always visible; mouse/touch focus stays quiet. */
+/* Text fields draw their own focus ring. */
+:where(a, button, select, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-brand-600);
+  outline-offset: 2px;
+}
+
+button:not(:disabled),
+[role="button"],
+a[href],
+label:has(input[type="checkbox"]),
+label:has(input[type="radio"]),
+select {
+  cursor: pointer;
 }
 
 /* Hide number spinners; amounts use inputmode="decimal" text inputs. */
@@ -47,12 +83,20 @@ input::-webkit-inner-spin-button {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-.animate-sheet-in { animation: sheet-in 200ms ease-out; }
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.animate-sheet-in { animation: sheet-in 220ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+@media (min-width: 64rem) {
+  .lg\:animate-pop-in { animation: pop-in 180ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+}
 .animate-fade-in { animation: fade-in 150ms ease-out; }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-sheet-in,
-  .animate-fade-in { animation: none; }
+  .animate-fade-in,
+  .lg\:animate-pop-in { animation: none !important; }
 }
 
 /* Statements print as plain black-on-white documents (Save as PDF). */

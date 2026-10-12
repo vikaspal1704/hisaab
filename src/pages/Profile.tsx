@@ -3,6 +3,7 @@ import { useAuth } from '../auth/AuthProvider'
 import { Avatar, AvatarStack } from '../components/Avatar'
 import { Page } from '../components/Page'
 import { PayMeSheet } from '../components/PayMeSheet'
+import { IconQr } from '../components/icons'
 import { useToast } from '../components/Toast'
 import { Button, ButtonLink, Card, Field, LoadingView, Row, SectionTitle, Segmented, TextInput } from '../components/ui'
 import { useHouseholds, useLedgerMutation, usePeople, useShortcuts } from '../hooks/queries'
@@ -24,8 +25,10 @@ export function ProfilePage() {
   if (!me) return <Page title={t('Me')} withNav><LoadingView /></Page>
 
   return (
-    <Page title={t('Me')} withNav>
-      <div className="flex items-center gap-4 pt-2">
+    <Page title={t('Me')} withNav wide>
+      <div className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-8">
+      <div>
+      <div className="flex items-center gap-4 pt-2 lg:rounded-3xl lg:bg-white lg:p-6 lg:shadow-card lg:ring-1 lg:ring-slate-200/70 dark:lg:bg-slate-900 dark:lg:ring-slate-800">
         <Avatar id={me.id} name={me.display_name} size={64} />
         <div>
           <p className="text-xl font-semibold">{me.display_name}</p>
@@ -33,11 +36,13 @@ export function ProfilePage() {
         </div>
       </div>
       <Button variant="secondary" block className="mt-4" onClick={() => setShowQr(true)}>
-        📱 {t('My UPI QR — let friends scan to pay')}
+        <IconQr size={18} /> {t('My UPI QR — let friends scan to pay')}
       </Button>
       {showQr ? <PayMeSheet open onClose={() => setShowQr(false)} /> : null}
 
       <ProfileForm key={`${me.display_name}|${me.upi_id}`} name={me.display_name} phone={me.phone} upi={me.upi_id ?? ''} />
+      </div>
+      <div className="lg:-mt-7">
 
       <SectionTitle action={<ButtonLink to="/pairs/new" variant="ghost" className="min-h-9 text-sm">{t('+ New pair')}</ButtonLink>}>
         {t('Couples & pairs')}
@@ -71,6 +76,8 @@ export function ProfilePage() {
       </Card>
 
       <Button variant="secondary" block className="mt-6" onClick={signOut}>{t('Sign out')}</Button>
+      </div>
+      </div>
     </Page>
   )
 }

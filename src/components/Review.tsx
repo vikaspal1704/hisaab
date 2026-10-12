@@ -37,7 +37,7 @@ export function ReviewCard({ rows }: { rows: ReviewRow[] }) {
   return (
     <>
       <div className="mt-6 mb-2 flex items-center justify-between px-1">
-        <h2 className="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">{t('To check')}</h2>
+        <h2 className="text-[13px] font-semibold tracking-wide text-slate-500 dark:text-slate-400">{t('To check')}</h2>
         <span className="rounded-full bg-amber-100 px-2 text-xs font-semibold text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">
           {rows.length}
         </span>

@@ -3,7 +3,9 @@ import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { CarpoolCard } from '../components/CarpoolCard'
-import { IconEdit } from '../components/icons'
+import { IconDownload, IconEdit, IconPlus, IconScale } from '../components/icons'
+import { KindIcon } from '../components/KindIcon'
+import { useIsDesktop } from '../hooks/useMediaQuery'
 import { BalanceLine } from '../components/Money'
 import { HeaderButton, Page } from '../components/Page'
 import { Sheet } from '../components/Sheet'
@@ -24,6 +26,7 @@ export function GroupPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
   const { t } = useT()
+  const desktop = useIsDesktop()
   const groups = useGroups()
   const people = usePeople()
   const balances = useGroupBalances(id)
@@ -52,29 +55,36 @@ export function GroupPage() {
   const turn = whoPaysNext(Object.fromEntries(rows.map((r) => [r.person_id, r.net])))
   // While a kitty is open the holder is "behind" by design (they hold everyone's money).
   const turnMatters = turn && turn.behindBy > group.tolerance && !group.kittyHolder
-  const icon: Record<string, string> = { expense: '🧾', payment: '🤝', treat: '🎁', forgive: '🙏' }
 
   return (
     <Page
       title={`${group.emoji ?? '👥'} ${group.name}`}
       back
+      wide
       actions={
-        <HeaderButton label={t('Edit group')} onClick={() => navigate(`/g/${id}/edit`)}>
-          <IconEdit />
-        </HeaderButton>
+        <>
+          {desktop ? (
+            <ButtonLink to={`/add?group=${id}`} className="min-h-10 text-sm"><IconPlus size={18} /> {t('Add a group expense')}</ButtonLink>
+          ) : null}
+          <HeaderButton label={t('Edit group')} onClick={() => navigate(`/g/${id}/edit`)}>
+            <IconEdit />
+          </HeaderButton>
+        </>
       }
-      footer={<ButtonLink to={`/add?group=${id}`} block className="mb-1">{t('Add a group expense')}</ButtonLink>}
+      footer={desktop ? undefined : <ButtonLink to={`/add?group=${id}`} block className="mb-1">{t('Add a group expense')}</ButtonLink>}
     >
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-x-8">
+      <div className="lg:col-start-1 lg:row-start-1">
       {group.kind === 'carpool' ? null : turnMatters ? (
-        <div className="mt-2 rounded-2xl bg-amber-50 p-4 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-900">
-          <p className="text-sm">⚖️ {group.kind === 'friends' ? t('Next baari') : t('Most behind')}</p>
+        <div className="mt-2 rounded-2xl bg-amber-50 p-4 text-amber-900 ring-1 ring-amber-200 lg:mt-0 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-900">
+          <p className="flex items-center gap-1.5 text-sm"><IconScale size={16} /> {group.kind === 'friends' ? t('Next baari') : t('Most behind')}</p>
           <p className="mt-1 text-lg font-semibold">
             {people.name(turn.personId)}
           </p>
           <p className="text-sm">{t('Behind by {amount} in this group', { amount: formatINR(turn.behindBy) })}</p>
         </div>
       ) : (
-        <p className="mt-2 rounded-2xl bg-white p-4 text-center text-sm text-slate-500 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
+        <p className="mt-2 rounded-2xl bg-white p-4 text-center text-sm text-slate-500 shadow-card ring-1 ring-slate-200/70 lg:mt-0 dark:bg-slate-900 dark:ring-slate-800">
           {group.kittyHolder
             ? t('The kitty is open, so the holder looks behind. Close the kitty to settle everyone up.')
             : t('Everyone in this group is even. Anyone can pay next!')}
@@ -93,11 +103,13 @@ export function GroupPage() {
       {group.kind === 'trip' ? <KittyCard group={group} /> : null}
       {group.kind === 'carpool' ? <CarpoolCard group={group} /> : null}
       {group.kind === 'home' || group.kind === 'office' ? <RecurringCard group={group} /> : null}
+      </div>
 
+      <div className="lg:sticky lg:top-8 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:-mt-7">
       <SectionTitle>{t('Balances in this group')}</SectionTitle>
       <Card className="divide-y divide-slate-100 dark:divide-slate-800">
         {rows.map((r) => (
-          <Link key={r.person_id} to={people.me?.id === r.person_id ? '/me' : `/p/${r.person_id}`} className="flex min-h-16 items-center gap-3 px-4 py-2">
+          <Link key={r.person_id} to={people.me?.id === r.person_id ? '/me' : `/p/${r.person_id}`} className="flex min-h-16 items-center gap-3 px-4 py-2 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40">
             <Avatar id={r.person_id} name={people.name(r.person_id, { you: false })} />
             <span className="min-w-0 flex-1">
               <span className="block truncate font-medium">{people.name(r.person_id)}</span>
@@ -109,11 +121,13 @@ export function GroupPage() {
           </Link>
         ))}
       </Card>
+      </div>
 
+      <div className="lg:col-start-1 lg:row-start-2">
       <SectionTitle
         action={
-          <Link to={`/statement/g/${id}`} className="flex min-h-9 items-center text-sm font-semibold text-brand-700 dark:text-brand-500">
-            ⬇️ {t('Export')}
+          <Link to={`/statement/g/${id}`} className="flex min-h-9 items-center gap-1.5 text-sm font-semibold text-brand-700 hover:underline dark:text-brand-400">
+            <IconDownload size={16} /> {t('Export')}
           </Link>
         }
       >
@@ -126,8 +140,8 @@ export function GroupPage() {
       ) : (
         <Card className="divide-y divide-slate-100 dark:divide-slate-800">
           {entries.data!.map((e) => (
-            <Link key={e.id} to={`/e/${e.id}`} className="flex min-h-14 items-center gap-3 px-4 py-2">
-              <span aria-hidden>{e.kitty ? '🏦' : (icon[e.kind] ?? '🧾')}</span>
+            <Link key={e.id} to={`/e/${e.id}`} className="flex min-h-14 items-center gap-3 px-4 py-2 transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/40">
+              <KindIcon kind={e.kitty ? 'kitty' : e.kind} className="h-9 w-9" />
               <span className="min-w-0 flex-1">
                 <span className="block truncate font-medium">{e.description}</span>
                 <span className="block text-xs text-slate-500">{formatDay(e.occurred_on)} · {people.name(e.created_by)}</span>
@@ -137,6 +151,8 @@ export function GroupPage() {
           ))}
         </Card>
       )}
+      </div>
+      </div>
     </Page>
   )
 }

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from './auth/AuthProvider'
 import { BottomNav } from './components/BottomNav'
+import { Sidebar } from './components/Sidebar'
 import { ErrorView, LoadingView } from './components/ui'
 import { useMyPersonId } from './hooks/queries'
 import { useLiveUpdates } from './hooks/useLiveUpdates'
@@ -65,6 +66,8 @@ export function App() {
 
   return (
     <>
+      <Sidebar />
+      <div className="lg:pl-72">
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/groups" element={<GroupsPage />} />
@@ -87,6 +90,7 @@ export function App() {
         <Route path="/statement/:kind/:id" element={<StatementPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </div>
       {NAV_ROUTES.includes(location.pathname) ? <BottomNav /> : null}
     </>
   )

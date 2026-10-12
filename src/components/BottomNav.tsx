@@ -13,7 +13,7 @@ export function BottomNav() {
   const { t } = useT()
   const unread = useUnreadCount()
   return (
-    <nav aria-label="Main" className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
+    <nav aria-label="Main" className="pb-safe fixed inset-x-0 bottom-0 z-30 border-t lg:hidden border-slate-200 bg-white/95 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95">
       <div className="mx-auto flex max-w-lg items-end px-2 pt-1">
         <NavLink to="/" end className={item}><IconHome />{t('Home')}</NavLink>
         <NavLink to="/groups" className={item}><IconGroups />{t('Groups')}</NavLink>
@@ -22,7 +22,7 @@ export function BottomNav() {
             type="button"
             onClick={() => navigate('/add')}
             aria-label={t('Add expense')}
-            className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-brand-700 text-white shadow-lg shadow-brand-700/30 active:bg-brand-800"
+            className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-brand-700 text-white shadow-lg shadow-brand-700/30 ring-4 ring-canvas transition-colors active:bg-brand-800 dark:bg-brand-600 dark:ring-canvas-dark"
           >
             <IconPlus size={28} />
           </button>

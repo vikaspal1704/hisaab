@@ -6,11 +6,12 @@ import { IconChevron } from './icons'
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
 
 const VARIANTS: Record<Variant, string> = {
-  primary: 'bg-brand-700 text-white active:bg-brand-800 disabled:bg-slate-300 dark:disabled:bg-slate-700',
+  primary:
+    'bg-brand-700 text-white shadow-sm shadow-brand-900/10 hover:bg-brand-800 active:bg-brand-900 disabled:bg-slate-300 disabled:shadow-none dark:bg-brand-600 dark:hover:bg-brand-500 dark:disabled:bg-slate-700',
   secondary:
-    'bg-white text-slate-900 ring-1 ring-slate-200 active:bg-slate-100 dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-700 dark:active:bg-slate-800',
-  ghost: 'text-brand-700 active:bg-brand-50 dark:text-brand-500 dark:active:bg-slate-800',
-  danger: 'bg-white text-red-600 ring-1 ring-red-200 active:bg-red-50 dark:bg-slate-900 dark:ring-red-900',
+    'bg-white text-slate-900 ring-1 ring-slate-200 hover:bg-slate-50 active:bg-slate-100 dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-700 dark:hover:bg-slate-800 dark:active:bg-slate-800',
+  ghost: 'text-brand-700 hover:bg-brand-50 active:bg-brand-100 dark:text-brand-400 dark:hover:bg-slate-800 dark:active:bg-slate-800',
+  danger: 'bg-white text-red-600 ring-1 ring-red-200 hover:bg-red-50 active:bg-red-100 dark:bg-slate-900 dark:ring-red-900 dark:hover:bg-red-950/40',
 }
 
 export function Button({
@@ -25,7 +26,7 @@ export function Button({
   return (
     <button
       type="button"
-      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-70 ${VARIANTS[variant]} ${block ? 'w-full' : ''} ${className}`}
+      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 font-semibold transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-70 ${VARIANTS[variant]} ${block ? 'w-full' : ''} ${className}`}
       disabled={disabled || busy}
       {...props}
     >
@@ -44,7 +45,7 @@ export function ButtonLink({ to, variant = 'primary', block, className = '', chi
   return (
     <Link
       to={to}
-      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 font-semibold ${VARIANTS[variant]} ${block ? 'w-full' : ''} ${className}`}
+      className={`inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 font-semibold transition-colors duration-150 ${VARIANTS[variant]} ${block ? 'w-full' : ''} ${className}`}
     >
       {children}
     </Link>
@@ -64,7 +65,7 @@ export function Spinner({ className = '' }: { className?: string }) {
 
 export function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl bg-white ring-1 ring-slate-200/80 dark:bg-slate-900 dark:ring-slate-800 ${className}`}>
+    <div className={`rounded-2xl bg-white shadow-card ring-1 ring-slate-200/70 dark:bg-slate-900 dark:shadow-none dark:ring-slate-800 ${className}`}>
       {children}
     </div>
   )
@@ -85,7 +86,7 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
 }
 
 export const inputClass =
-  'block w-full min-h-12 rounded-xl border-0 bg-white px-3.5 text-base ring-1 ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-brand-600 focus:outline-none dark:bg-slate-900 dark:ring-slate-700'
+  'block w-full min-h-12 rounded-xl border-0 bg-white px-3.5 text-base ring-1 ring-slate-300 transition-shadow placeholder:text-slate-400 hover:ring-slate-400 focus:ring-2 focus:ring-brand-600 focus:outline-none dark:bg-slate-900 dark:ring-slate-700 dark:hover:ring-slate-600'
 
 export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
   return <input className={inputClass} {...props} />
@@ -111,10 +112,10 @@ export function Segmented<T extends string>({
           role="radio"
           aria-checked={value === o.value}
           onClick={() => onChange(o.value)}
-          className={`min-h-10 flex-1 rounded-lg text-sm font-medium transition-colors ${
+          className={`min-h-10 flex-1 rounded-lg px-2 text-sm font-medium transition-colors ${
             value === o.value
               ? 'bg-white text-slate-900 shadow-sm dark:bg-slate-950 dark:text-white'
-              : 'text-slate-600 dark:text-slate-400'
+              : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
           }`}
         >
           {o.label}
@@ -153,7 +154,7 @@ export function Row({
       {chevron && (to || onClick) ? <IconChevron size={18} className="shrink-0 text-slate-400" /> : null}
     </>
   )
-  const cls = 'flex w-full min-h-16 items-center gap-3 px-4 py-2.5 text-left active:bg-slate-50 dark:active:bg-slate-800/60'
+  const cls = 'flex w-full min-h-16 items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-slate-50 active:bg-slate-100 dark:hover:bg-slate-800/40 dark:active:bg-slate-800/60'
   if (to) return <Link to={to} className={cls}>{content}</Link>
   if (onClick) return <button type="button" onClick={onClick} className={cls}>{content}</button>
   return <div className={cls}>{content}</div>
@@ -161,8 +162,8 @@ export function Row({
 
 export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
-    <div className="mt-6 mb-2 flex items-center justify-between px-1">
-      <h2 className="text-xs font-semibold tracking-wider text-slate-500 uppercase dark:text-slate-400">{children}</h2>
+    <div className="mt-7 mb-2.5 flex min-h-6 items-center justify-between px-1">
+      <h2 className="text-[13px] font-semibold tracking-wide text-slate-500 dark:text-slate-400">{children}</h2>
       {action}
     </div>
   )
@@ -181,8 +182,18 @@ export function EmptyState({ icon, title, body, action }: { icon?: ReactNode; ti
 
 export function LoadingView() {
   return (
-    <div className="flex justify-center py-16 text-brand-700">
-      <Spinner />
+    <div className="space-y-3 py-6" aria-busy="true">
+      <span className="sr-only"><Spinner /></span>
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="flex animate-pulse items-center gap-3 rounded-2xl bg-white p-4 ring-1 ring-slate-200/70 dark:bg-slate-900 dark:ring-slate-800">
+          <div className="h-10 w-10 rounded-full bg-slate-200 dark:bg-slate-800" />
+          <div className="flex-1 space-y-2">
+            <div className="h-3 w-1/2 rounded bg-slate-200 dark:bg-slate-800" />
+            <div className="h-3 w-1/3 rounded bg-slate-100 dark:bg-slate-800/60" />
+          </div>
+          <div className="h-4 w-16 rounded bg-slate-200 dark:bg-slate-800" />
+        </div>
+      ))}
     </div>
   )
 }

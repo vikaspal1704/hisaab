@@ -250,7 +250,7 @@ function SeatTally({ group, counts }: { group: Group; counts: SeatCount[] }) {
         ))}
       </Card>
       {group.carpoolStyle === 'turns' ? null : (
-        <p className="mt-1 px-1 text-xs text-slate-500">{t('Money for rides is in “Balances in this group” below.')}</p>
+        <p className="mt-1 px-1 text-xs text-slate-500">{t('Money for rides is in “Balances in this group”.')}</p>
       )}
     </>
   )

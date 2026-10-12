@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
-import { IconCopy, IconSwap, IconWhatsApp } from '../components/icons'
+import { IconCopy, IconQr, IconSwap, IconWhatsApp } from '../components/icons'
 import { Page } from '../components/Page'
 import { Sheet } from '../components/Sheet'
 import { useToast } from '../components/Toast'
@@ -242,7 +242,7 @@ function SettleForm({ me, title, members }: { me: Person; title: string; members
         ) : null}
         {!iPay && method === 'upi' && amount ? (
           <button type="button" onClick={() => setShowQr(true)} className="flex min-h-10 items-center gap-2 text-sm font-semibold text-brand-700 dark:text-brand-500">
-            📱 {t('Show my UPI QR for {amount}', { amount: formatINR(amount) })}
+            <IconQr size={17} /> {t('Show my UPI QR for {amount}', { amount: formatINR(amount) })}
           </button>
         ) : null}
         {showQr && amount ? <PayMeSheet open onClose={() => setShowQr(false)} amount={amount} payerName={counterpartName} /> : null}

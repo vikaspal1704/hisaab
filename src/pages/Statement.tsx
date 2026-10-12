@@ -65,8 +65,8 @@ function StatementView({ statement }: { statement: Statement }) {
   }
 
   return (
-    <Page title={t('Statement')} back>
-      <div className="mt-2 grid grid-cols-2 gap-2 print:hidden">
+    <Page title={t('Statement')} back wide>
+      <div className="mt-2 grid grid-cols-2 gap-2 print:hidden lg:mt-0 lg:flex lg:justify-end">
         <Button onClick={() => window.print()}>📄 {t('Save as PDF')}</Button>
         <Button variant="secondary" onClick={download}>⬇️ {t('Download CSV')}</Button>
         {canShareFile ? (

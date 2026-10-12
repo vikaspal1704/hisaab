@@ -1,6 +1,6 @@
 // App-shell service worker: makes Hisaab installable and open instantly.
 // Data always comes from the network (Supabase); only static assets are cached.
-const CACHE = 'hisaab-shell-v2'
+const CACHE = 'hisaab-shell-v3'
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(['./', './index.html'])))

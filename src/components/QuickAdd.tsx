@@ -86,7 +86,9 @@ export function QuickAdd() {
   if (friends.length === 0 && groupChips.length === 0) return null
   const chip = (active: boolean) =>
     `min-h-9 shrink-0 rounded-full px-3 text-sm font-medium ring-1 ${
-      active ? 'bg-brand-700 text-white ring-brand-700' : 'bg-white ring-slate-200 dark:bg-slate-900 dark:ring-slate-700'
+      active
+        ? 'bg-brand-700 text-white ring-brand-700'
+        : 'bg-white ring-slate-200 transition-colors hover:bg-slate-50 dark:bg-slate-900 dark:ring-slate-700 dark:hover:bg-slate-800'
     }`
 
   return (
@@ -114,7 +116,7 @@ export function QuickAdd() {
           {t('Add')}
         </button>
       </form>
-      <div className="-mx-3 mt-2 flex gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none]" aria-label={t('With')}>
+      <div className="-mx-3 mt-2 flex gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0" aria-label={t('With')}>
         {groupChips.map((g) => (
           <button
             key={g.id}

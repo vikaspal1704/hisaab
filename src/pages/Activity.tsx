@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+import { KindIcon } from '../components/KindIcon'
 import { SearchBox } from '../components/PeoplePicker'
 import { IconActivity } from '../components/icons'
 import { toneClass } from '../components/Money'
@@ -23,13 +24,15 @@ export function ActivityPage() {
   useEffect(() => {
     if (newest) markActivitySeen(newest)
   }, [newest])
+  const [params] = useSearchParams()
   const [query, setQuery] = useState('')
+  const focusSearch = params.get('search') === '1'
   const search = useDebounced(query.trim(), 250)
 
   return (
     <Page title={t('Activity')} withNav>
       <div className="mt-2">
-        <SearchBox value={query} onChange={setQuery} placeholder={t('Search: dosa, Goa, Rahul, 450…')} />
+        <SearchBox value={query} onChange={setQuery} placeholder={t('Search: dosa, Goa, Rahul, 450…')} autoFocus={focusSearch} />
       </div>
       {query.trim() ? (
         <SearchResults query={search} />
@@ -81,10 +84,8 @@ function SearchResults({ query }: { query: string }) {
 function SearchItem({ row }: { row: SearchRow }) {
   const effect = useEffectText()({ ...row, is_deleted: false })
   return (
-    <Link to={`/e/${row.entry_id}`} className="flex items-start gap-3 px-4 py-3 active:bg-slate-50 dark:active:bg-slate-800/60">
-      <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg dark:bg-slate-800" aria-hidden>
-        {ICON[row.kind]}
-      </span>
+    <Link to={`/e/${row.entry_id}`} className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-slate-50 active:bg-slate-100 dark:hover:bg-slate-800/40 dark:active:bg-slate-800/60">
+      <KindIcon kind={row.kind} className="mt-0.5" />
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium">{row.description}</span>
         <span className="block text-sm text-slate-500 dark:text-slate-400">
@@ -110,17 +111,14 @@ function useEffectText() {
   }
 }
 
-const ICON: Record<string, string> = { expense: '🧾', payment: '🤝', forgive: '🙏', treat: '🎁' }
 
 function ActivityItem({ row, actor }: { row: ActivityRow; actor: string }) {
   const { t } = useT()
   const effect = useEffectText()(row)
   const verb = t({ created: 'added', edited: 'edited', deleted: 'deleted', restored: 'restored' }[row.action])
   return (
-    <Link to={`/e/${row.entry_id}`} className="flex items-start gap-3 px-4 py-3 active:bg-slate-50 dark:active:bg-slate-800/60">
-      <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg dark:bg-slate-800" aria-hidden>
-        {row.action === 'deleted' ? '🗑️' : ICON[row.kind]}
-      </span>
+    <Link to={`/e/${row.entry_id}`} className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-slate-50 active:bg-slate-100 dark:hover:bg-slate-800/40 dark:active:bg-slate-800/60">
+      <KindIcon kind={row.action === 'deleted' ? 'deleted' : row.kind} className="mt-0.5" />
       <span className="min-w-0 flex-1">
         <span className="block">
           <span className="font-medium">{actor}</span> {verb} <span className="font-medium">“{row.description}”</span>

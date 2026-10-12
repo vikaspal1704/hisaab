@@ -466,7 +466,7 @@ function ExpenseForm({
           onChange={(e) => set({ description: e.target.value })}
           className={inputClass}
         />
-        <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
+        <div className="-mx-4 mt-2 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0">
           {QUICK.map((q) => (
             <button
               key={q}

@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { ForgiveSheet, FriendSettingsSheet, InviteSheet, LentSheet, NudgeSheet, ShareSheet } from '../components/FriendSheets'
-import { IconSwap, IconWhatsApp } from '../components/icons'
+import { IconDownload, IconGift, IconHandshake, IconHeartHand, IconQr, IconSettings, IconShare, IconSwap, IconWhatsApp } from '../components/icons'
+import { KindIcon } from '../components/KindIcon'
+import { useIsDesktop } from '../hooks/useMediaQuery'
 import { toneClass } from '../components/Money'
 import { HeaderButton, Page } from '../components/Page'
 import { PayMeSheet } from '../components/PayMeSheet'
@@ -29,6 +31,7 @@ type SheetName = 'settings' | 'lent' | 'forgive' | 'share' | 'nudge' | 'qr' | 'i
 export function FriendPage() {
   const { id = '' } = useParams()
   const { t } = useT()
+  const desktop = useIsDesktop()
   const people = usePeople()
   const balances = useBalances()
   const ledger = usePersonLedger(id)
@@ -85,7 +88,14 @@ export function FriendPage() {
           : null
   const reactionOf = (entryId: string) => reactions.data?.find((r) => r.entry_id === entryId && r.person_id === id)
 
-  const pill = 'inline-flex min-h-10 items-center gap-2 rounded-full px-4 text-sm font-semibold'
+  const mainActions = (
+    <div className="flex gap-3 pb-1 lg:pb-0">
+      <ButtonLink to={`/add?with=${id}`} variant="secondary" className="flex-1">{t('Add expense')}</ButtonLink>
+      <ButtonLink to={`/settle/person/${id}`} className="flex-1"><IconSwap size={18} /> {t('Settle up')}</ButtonLink>
+    </div>
+  )
+  const pill = 'inline-flex min-h-10 items-center gap-2 rounded-full px-4 text-sm font-semibold transition-colors'
+  const soft = `${pill} bg-white text-slate-700 shadow-card ring-1 ring-slate-200/80 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700 dark:hover:bg-slate-700`
 
   return (
     <Page
@@ -94,18 +104,16 @@ export function FriendPage() {
       actions={
         person.is_contact ? (
           <HeaderButton label={t('Settings')} onClick={() => setSheet('settings')}>
-            <span aria-hidden className="text-xl">⚙️</span>
+            <IconSettings />
           </HeaderButton>
         ) : undefined
       }
-      footer={
-        <div className="flex gap-3 pb-1">
-          <ButtonLink to={`/add?with=${id}`} variant="secondary" className="flex-1">{t('Add expense')}</ButtonLink>
-          <ButtonLink to={`/settle/person/${id}`} className="flex-1"><IconSwap size={18} /> {t('Settle up')}</ButtonLink>
-        </div>
-      }
+      wide
+      footer={desktop ? undefined : mainActions}
     >
-      <div className="flex flex-col items-center pt-2 text-center">
+      <div className="lg:grid lg:grid-cols-[22rem_minmax(0,1fr)] lg:items-start lg:gap-8">
+      <div className="lg:sticky lg:top-8">
+      <div className="flex flex-col items-center pt-2 text-center lg:rounded-3xl lg:bg-white lg:p-6 lg:shadow-card lg:ring-1 lg:ring-slate-200/70 dark:lg:bg-slate-900 dark:lg:ring-slate-800">
         <Avatar id={person.id} name={name} size={72} />
         <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
           {formatPhone(person.phone)} · {baari ? t('Baari') : t('Exact splits')}
@@ -114,23 +122,23 @@ export function FriendPage() {
         {detail ? <p className="mt-1 max-w-xs text-sm text-slate-500 dark:text-slate-400">{detail}</p> : null}
 
         <div className="mt-4 flex flex-wrap justify-center gap-2">
-          <button type="button" onClick={() => setSheet('lent')} className={`${pill} bg-slate-200/70 dark:bg-slate-800`}>🤝 {t('Lent / borrowed')}</button>
-          <Link to={`/treat?with=${id}`} className={`${pill} bg-slate-200/70 dark:bg-slate-800`}>🎁 {t('Treat')}</Link>
+          <button type="button" onClick={() => setSheet('lent')} className={soft}><IconHandshake size={17} /> {t('Lent / borrowed')}</button>
+          <Link to={`/treat?with=${id}`} className={soft}><IconGift size={17} /> {t('Treat')}</Link>
           {net > 0 ? (
-            <button type="button" onClick={() => setSheet('qr')} className={`${pill} bg-slate-200/70 dark:bg-slate-800`}>📱 {t('QR to pay')}</button>
+            <button type="button" onClick={() => setSheet('qr')} className={soft}><IconQr size={17} /> {t('QR to pay')}</button>
           ) : null}
           {net > 0 ? (
-            <button type="button" onClick={() => setSheet('forgive')} className={`${pill} bg-slate-200/70 dark:bg-slate-800`}>🙏 {t('Chhod do')}</button>
+            <button type="button" onClick={() => setSheet('forgive')} className={soft}><IconHeartHand size={17} /> {t('Chhod do')}</button>
           ) : null}
           {state.kind === 'they_owe' ? (
-            <button type="button" onClick={() => setSheet('nudge')} className={`${pill} bg-[#25D366]/15 text-[#128C7E] dark:text-[#25D366]`}>
+            <button type="button" onClick={() => setSheet('nudge')} className={`${pill} bg-[#25D366]/15 text-[#0b7a63] hover:bg-[#25D366]/25 dark:text-[#25D366]`}>
               <IconWhatsApp size={18} /> {t('Remind')}
             </button>
           ) : null}
-          <button type="button" onClick={() => setSheet('share')} className={`${pill} bg-slate-200/70 dark:bg-slate-800`}>🔗 {t('Share hisaab')}</button>
-          <Link to={`/statement/p/${id}`} className={`${pill} bg-slate-200/70 dark:bg-slate-800`}>⬇️ {t('Export')}</Link>
+          <button type="button" onClick={() => setSheet('share')} className={soft}><IconShare size={17} /> {t('Share hisaab')}</button>
+          <Link to={`/statement/p/${id}`} className={soft}><IconDownload size={17} /> {t('Export')}</Link>
           {!person.is_registered ? (
-            <button type="button" onClick={() => setSheet('invite')} className={`${pill} bg-[#25D366]/15 text-[#128C7E] dark:text-[#25D366]`}>
+            <button type="button" onClick={() => setSheet('invite')} className={`${pill} bg-[#25D366]/15 text-[#0b7a63] hover:bg-[#25D366]/25 dark:text-[#25D366]`}>
               <IconWhatsApp size={18} /> {t('Invite')}
             </button>
           ) : null}
@@ -144,15 +152,16 @@ export function FriendPage() {
           </p>
         ) : null}
         {household ? (
-          <Link to={`/h/${household.id}`} className="mt-3 text-sm font-medium text-brand-700 dark:text-brand-500">
+          <Link to={`/h/${household.id}`} className="mt-3 text-sm font-medium text-brand-700 hover:underline dark:text-brand-400">
             {t('Part of “{name}” →', { name: household.name })}
           </Link>
         ) : null}
+        {desktop ? <div className="mt-6 w-full">{mainActions}</div> : null}
       </div>
 
       {treats.data && (treats.data.i_gave > 0 || treats.data.they_gave > 0) ? (
         <Card className="mt-5 p-4 text-sm">
-          <p className="font-semibold">🎁 {t('Treats')}</p>
+          <p className="flex items-center gap-2 font-semibold"><IconGift size={17} className="text-amber-600" /> {t('Treats')}</p>
           <p className="mt-1 text-slate-600 dark:text-slate-300">
             {t('You gave {mine} ({mineAmount}) · {name} gave {theirs} ({theirsAmount})', {
               mine: treats.data.i_gave,
@@ -167,7 +176,9 @@ export function FriendPage() {
           ) : null}
         </Card>
       ) : null}
+      </div>
 
+      <div className="lg:-mt-7">
       {months.length === 0 ? (
         <EmptyState title={t('No entries yet')} body={t('When you or {name} add an expense, it shows up here with a running balance.', { name })} />
       ) : (
@@ -182,6 +193,8 @@ export function FriendPage() {
           </section>
         ))
       )}
+      </div>
+      </div>
 
       {sheet === 'settings' ? <FriendSettingsSheet open onClose={() => setSheet(null)} personId={id} prefs={prefs} currentName={name} /> : null}
       {sheet === 'lent' ? <LentSheet open onClose={() => setSheet(null)} personId={id} /> : null}
@@ -193,8 +206,6 @@ export function FriendPage() {
     </Page>
   )
 }
-
-const KIND_ICON: Record<string, string> = { expense: '🧾', payment: '🤝', forgive: '🙏', treat: '🎁' }
 
 function PassbookRow({ row, name, reaction }: { row: LedgerRow; name: string; reaction?: Reaction }) {
   const { t } = useT()
@@ -211,28 +222,26 @@ function PassbookRow({ row, name, reaction }: { row: LedgerRow; name: string; re
           ? t('{name} owes you', { name })
           : t('You owe {name}', { name })
   return (
-    <Link to={`/e/${row.entry_id}`} className="flex items-start gap-3 px-4 py-3 active:bg-slate-50 dark:active:bg-slate-800/60">
-      <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg dark:bg-slate-800" aria-hidden>
-        {KIND_ICON[row.kind] ?? '🧾'}
-      </span>
+    <Link to={`/e/${row.entry_id}`} className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-slate-50 active:bg-slate-100 dark:hover:bg-slate-800/40 dark:active:bg-slate-800/60">
+      <KindIcon kind={row.kind} className="mt-0.5" />
       <span className="min-w-0 flex-1">
-        <span className="block truncate font-medium">{row.description}</span>
+        <span className="line-clamp-2 font-medium break-words">{row.description}</span>
         <span className="block text-sm text-slate-500 dark:text-slate-400">
           {formatDay(row.occurred_on)} · {formatINR(row.amount)}
           {reaction?.status === 'confirmed' ? ` · ${t('{name} 👍', { name })}` : ''}
           {reaction?.status === 'questioned' ? ` · ❓ ${t('questioned')}` : ''}
         </span>
-      </span>
-      <span className="text-right">
-        <span className={`block text-sm ${toneClass(row.delta)}`}>{what}</span>
-        <span className={`block font-semibold tabular-nums ${toneClass(row.delta)}`}>{formatINR(Math.abs(row.delta))}</span>
-        <span className="block text-xs text-slate-500 tabular-nums dark:text-slate-400">
+        <span className="mt-0.5 block text-xs text-slate-500 tabular-nums dark:text-slate-400">
           {row.running === 0
             ? t('Balance: settled')
             : row.running > 0
               ? t('Balance: {name} owes {amount}', { name, amount: formatINR(row.running) })
               : t('Balance: you owe {amount}', { amount: formatINR(-row.running) })}
         </span>
+      </span>
+      <span className="shrink-0 text-right">
+        <span className={`block font-semibold tabular-nums ${toneClass(row.delta)}`}>{formatINR(Math.abs(row.delta))}</span>
+        <span className={`block text-xs ${toneClass(row.delta)}`}>{what}</span>
       </span>
     </Link>
   )

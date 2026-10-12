@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { IconCheck } from '../components/icons'
 import { Button, Field, TextInput } from '../components/ui'
 import { friendlyError } from '../lib/errors'
 import { normalizePhone } from '../lib/phone'
@@ -22,35 +23,80 @@ export function LoginPage() {
     }
   }
 
+  const features = [
+    t('Aaj maine diya, kal tu de — Hisaab remembers whose baari it is'),
+    t('Friends can check without installing anything'),
+    t('Couples can settle together'),
+  ]
   return (
-    <div className="pt-safe mx-auto flex min-h-dvh max-w-lg flex-col px-6">
-      <div className="flex flex-1 flex-col justify-center py-10">
-        <div className="flex items-center justify-between">
-          <img src="./icon.svg" alt="" className="h-16 w-16" />
-          <button type="button" onClick={() => setLang(lang === 'hi' ? 'en' : 'hi')} className="min-h-9 rounded-full px-3 text-sm ring-1 ring-slate-300 dark:ring-slate-700">
+    <div className="flex min-h-dvh flex-col lg:grid lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+      {/* Brand panel (laptop) / header (phone) */}
+      <section className="pt-safe relative overflow-hidden bg-gradient-to-br from-brand-800 via-brand-700 to-brand-900 px-6 pb-10 text-white lg:flex lg:flex-col lg:justify-between lg:px-14 lg:py-12">
+        <div aria-hidden className="pointer-events-none absolute -top-24 -right-24 h-72 w-72 rounded-full bg-white/10 blur-2xl" />
+        <div aria-hidden className="pointer-events-none absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-brand-400/20 blur-3xl" />
+        <div className="relative flex items-center justify-between pt-6 lg:pt-0">
+          <span className="flex items-center gap-2.5">
+            <img src="./icon.svg" alt="" className="h-10 w-10 rounded-xl ring-1 ring-white/20" />
+            <span className="text-xl font-bold tracking-tight">Hisaab</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setLang(lang === 'hi' ? 'en' : 'hi')}
+            className="min-h-9 rounded-full px-3 text-sm ring-1 ring-white/30 transition-colors hover:bg-white/10"
+          >
             {lang === 'hi' ? 'English' : 'Hinglish'}
           </button>
         </div>
-        <h1 className="mt-6 text-3xl font-bold tracking-tight">Hisaab</h1>
-        <p className="mt-2 text-lg text-slate-600 dark:text-slate-300">
-          {t('Keep the books with your friends. No more splitting every bill — take turns paying, and Hisaab keeps it fair.')}
-        </p>
-        <ul className="mt-6 space-y-2 text-slate-600 dark:text-slate-300">
-          <li>✓ {t('Aaj maine diya, kal tu de — Hisaab remembers whose baari it is')}</li>
-          <li>✓ {t('Friends can check without installing anything')}</li>
-          <li>✓ {t('Couples can settle together')}</li>
-        </ul>
-      </div>
-      <div className="pb-safe space-y-3 pb-6">
-        {phoneOtpEnabled ? <PhoneLogin /> : null}
-        <Button variant={phoneOtpEnabled ? 'secondary' : 'primary'} block busy={busy} onClick={google}>
-          <GoogleMark /> {t('Continue with Google')}
-        </Button>
-        {error ? <p className="text-center text-sm text-red-600">{error}</p> : null}
-        <p className="text-center text-xs text-slate-500 dark:text-slate-400">
-          {t('Friends find you by your phone number, which you add next.')}
-        </p>
-      </div>
+        <div className="relative mt-10 max-w-lg lg:mt-0">
+          <h1 className="text-3xl leading-tight font-bold tracking-tight lg:text-5xl">{t('Keep the books with your friends.')}</h1>
+          <p className="mt-3 text-lg text-brand-100 lg:text-xl">
+            {t('No more splitting every bill — take turns paying, and Hisaab keeps it fair.')}
+          </p>
+          <ul className="mt-6 space-y-2.5">
+            {features.map((f) => (
+              <li key={f} className="flex items-start gap-2.5 text-brand-50">
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-white/15"><IconCheck size={14} /></span>
+                {f}
+              </li>
+            ))}
+          </ul>
+        </div>
+        {/* A glimpse of the app (laptop only) */}
+        <div aria-hidden className="relative mt-10 hidden max-w-md rounded-2xl bg-white/10 p-4 ring-1 ring-white/15 backdrop-blur lg:block">
+          <p className="text-sm text-brand-100">{t('Overall, you are owed {amount}', { amount: '₹1,240' })}</p>
+          <div className="mt-3 space-y-2 text-sm">
+            {[
+              ['Rahul', t('{name}’s baari', { name: 'Rahul' }), '₹915'],
+              ['Priya', t('Your baari with {name}', { name: 'Priya' }), '₹340'],
+              ['Goa trip', t('All square'), '—'],
+            ].map(([who, what, amount]) => (
+              <div key={who} className="flex items-center gap-3 rounded-xl bg-white/10 px-3 py-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-xs font-bold">{who[0]}</span>
+                <span className="flex-1">{what}</span>
+                <span className="font-semibold tabular-nums">{amount}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Sign in */}
+      <section className="pb-safe flex flex-1 items-start justify-center px-6 py-10 lg:items-center lg:px-14">
+        <div className="w-full max-w-sm">
+          <h2 className="text-2xl font-bold tracking-tight">{t('Sign in')}</h2>
+          <p className="mt-1 text-slate-600 dark:text-slate-400">{t('Free, no ads. Your friends don’t need the app to start.')}</p>
+          <div className="mt-8 space-y-3">
+            {phoneOtpEnabled ? <PhoneLogin /> : null}
+            <Button variant="secondary" block busy={busy} onClick={google}>
+              <GoogleMark /> {t('Continue with Google')}
+            </Button>
+            {error ? <p className="text-center text-sm text-red-600">{error}</p> : null}
+          </div>
+          <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
+            {t('Friends find you by your phone number, which you add next.')}
+          </p>
+        </div>
+      </section>
     </div>
   )
 }
