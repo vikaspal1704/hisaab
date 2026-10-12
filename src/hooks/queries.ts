@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useMemo } from 'react'
 import { api } from '../lib/api'
 import type { Paise } from '../lib/money'
-import type { Balance, Household, Person } from '../lib/types'
+import type { Balance, ContactPrefs, Household, Person } from '../lib/types'
 
 export const keys = {
   me: ['me'] as const,
@@ -15,6 +15,14 @@ export const keys = {
   ledger: (id: string) => ['ledger', id] as const,
   activity: ['activity'] as const,
   entry: (id: string) => ['entry', id] as const,
+  contactPrefs: ['contact-prefs'] as const,
+  reviews: ['reviews'] as const,
+  shortcuts: ['shortcuts'] as const,
+  treats: (id: string) => ['treats', id] as const,
+  shareLink: (id: string) => ['share-link', id] as const,
+  kitty: (id: string) => ['kitty', id] as const,
+  recurring: (id: string) => ['recurring', id] as const,
+  reactions: (ids: string[]) => ['reactions', ...ids] as const,
 }
 
 export const useMyPersonId = (enabled = true) => useQuery({ queryKey: keys.me, queryFn: api.myPersonId, enabled })
@@ -28,6 +36,29 @@ export const usePersonLedger = (id: string) => useQuery({ queryKey: keys.ledger(
 export const useActivity = () => useQuery({ queryKey: keys.activity, queryFn: () => api.activity(100) })
 export const useEntry = (id: string | undefined) =>
   useQuery({ queryKey: keys.entry(id ?? ''), queryFn: () => api.entry(id!), enabled: Boolean(id) })
+
+export const useReviews = () => useQuery({ queryKey: keys.reviews, queryFn: api.reviews })
+export const useShortcuts = () => useQuery({ queryKey: keys.shortcuts, queryFn: api.shortcuts })
+export const useTreatSummary = (id: string) => useQuery({ queryKey: keys.treats(id), queryFn: () => api.treatSummary(id) })
+export const useShareLink = (id: string) => useQuery({ queryKey: keys.shareLink(id), queryFn: () => api.activeShareLink(id) })
+export const useKitty = (id: string, enabled: boolean) =>
+  useQuery({ queryKey: keys.kitty(id), queryFn: () => api.groupKitty(id), enabled })
+export const useRecurring = (id: string, enabled: boolean) =>
+  useQuery({ queryKey: keys.recurring(id), queryFn: () => api.recurring(id), enabled })
+export const useReactions = (ids: string[]) =>
+  useQuery({ queryKey: keys.reactions(ids), queryFn: () => api.reactionsFor(ids), enabled: ids.length > 0 })
+
+const DEFAULT_PREFS = { style: 'baari' as const, tolerance: 10000, remind_above: 50000, remind_after_days: 14, last_nudged_at: null }
+
+/** My settings for each friend, with defaults for anyone not in my contacts. */
+export function useContactPrefs() {
+  const query = useQuery({ queryKey: keys.contactPrefs, queryFn: api.contactPrefs })
+  return useMemo(() => {
+    const byId = new Map((query.data ?? []).map((c) => [c.person_id, c]))
+    const prefs = (id: string): ContactPrefs => byId.get(id) ?? { person_id: id, ...DEFAULT_PREFS }
+    return { ...query, prefs }
+  }, [query])
+}
 
 /** People keyed by id, plus a name lookup that never fails. */
 export function usePeople() {

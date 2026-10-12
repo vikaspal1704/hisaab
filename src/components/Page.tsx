@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useT } from '../lib/i18n'
 import { IconBack } from './icons'
 
 /** Screen scaffold: sticky top bar with optional back button and actions. */
@@ -19,6 +20,7 @@ export function Page({
   withNav?: boolean
 }) {
   const navigate = useNavigate()
+  const { t } = useT()
   const goBack = () => {
     if (typeof back === 'string') navigate(back)
     else if (window.history.state?.idx > 0) navigate(-1)
@@ -29,7 +31,7 @@ export function Page({
       <header className="pt-safe sticky top-0 z-20 bg-slate-50/90 backdrop-blur dark:bg-slate-950/90">
         <div className="flex h-14 items-center gap-1 px-2">
           {back ? (
-            <button type="button" onClick={goBack} aria-label="Back" className="flex h-11 w-11 items-center justify-center rounded-full active:bg-slate-200 dark:active:bg-slate-800">
+            <button type="button" onClick={goBack} aria-label={t('Back')} className="flex h-11 w-11 items-center justify-center rounded-full active:bg-slate-200 dark:active:bg-slate-800">
               <IconBack />
             </button>
           ) : (

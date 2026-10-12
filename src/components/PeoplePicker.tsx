@@ -3,12 +3,14 @@ import { usePeople, useLedgerMutation } from '../hooks/queries'
 import { api } from '../lib/api'
 import { friendlyError } from '../lib/errors'
 import { normalizePhone } from '../lib/phone'
+import { useT } from '../lib/i18n'
 import { Avatar } from './Avatar'
 import { IconCheck, IconSearch } from './icons'
 import { Button, inputClass, TextInput } from './ui'
 
 /** Name + phone mini form for adding a friend without leaving the current screen. */
 export function InlineAddFriend({ onAdded, initialName = '' }: { onAdded: (id: string) => void; initialName?: string }) {
+  const { t } = useT()
   const [name, setName] = useState(initialName)
   const [phone, setPhone] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -16,8 +18,8 @@ export function InlineAddFriend({ onAdded, initialName = '' }: { onAdded: (id: s
 
   const add = () => {
     const e164 = normalizePhone(phone)
-    if (!name.trim()) return setError('Enter a name')
-    if (!e164) return setError('Enter a valid mobile number')
+    if (!name.trim()) return setError(t('Enter a name'))
+    if (!e164) return setError(t('Enter a valid mobile number'))
     setError(null)
     mutation.mutate(
       { phone: e164, name: name.trim() },
@@ -34,11 +36,11 @@ export function InlineAddFriend({ onAdded, initialName = '' }: { onAdded: (id: s
 
   return (
     <div className="space-y-3 rounded-2xl bg-slate-50 p-3 dark:bg-slate-800/50">
-      <p className="text-sm font-medium">New friend</p>
-      <TextInput placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
-      <TextInput type="tel" inputMode="tel" placeholder="Mobile number" value={phone} onChange={(e) => setPhone(e.target.value)} />
+      <p className="text-sm font-medium">{t('New friend')}</p>
+      <TextInput placeholder={t('Name')} value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
+      <TextInput type="tel" inputMode="tel" placeholder={t('Mobile number')} value={phone} onChange={(e) => setPhone(e.target.value)} />
       {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
-      <Button block variant="secondary" busy={mutation.isPending} onClick={add}>Add friend</Button>
+      <Button block variant="secondary" busy={mutation.isPending} onClick={add}>{t('Add friend')}</Button>
     </div>
   )
 }
@@ -54,6 +56,7 @@ export function ContactChecklist({
   allowAdd?: boolean
 }) {
   const people = usePeople()
+  const { t } = useT()
   const [query, setQuery] = useState('')
   const contacts = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -72,7 +75,7 @@ export function ContactChecklist({
             <CheckRow checked={selected.has(p.id)} onClick={() => onToggle(p.id)} id={p.id} name={p.display_name} />
           </li>
         ))}
-        {contacts.length === 0 ? <li className="py-4 text-center text-sm text-slate-500">No matching friends</li> : null}
+        {contacts.length === 0 ? <li className="py-4 text-center text-sm text-slate-500">{t('No matching friends')}</li> : null}
       </ul>
       {allowAdd ? <InlineAddFriend onAdded={(id) => onToggle(id)} initialName={contacts.length === 0 ? query : ''} /> : null}
     </div>
@@ -80,6 +83,7 @@ export function ContactChecklist({
 }
 
 export function SearchBox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { t } = useT()
   return (
     <div className="relative">
       <IconSearch size={18} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-slate-400" />
@@ -87,8 +91,8 @@ export function SearchBox({ value, onChange }: { value: string; onChange: (v: st
         type="search"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Search name or number"
-        aria-label="Search"
+        placeholder={t('Search name or number')}
+        aria-label={t('Search')}
         className={`${inputClass} pl-10`}
       />
     </div>

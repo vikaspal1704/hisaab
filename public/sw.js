@@ -1,6 +1,6 @@
 // App-shell service worker: makes Hisaab installable and open instantly.
 // Data always comes from the network (Supabase); only static assets are cached.
-const CACHE = 'hisaab-shell-v1'
+const CACHE = 'hisaab-shell-v2'
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(['./', './index.html'])))
@@ -37,5 +37,36 @@ self.addEventListener('fetch', (event) => {
           return response
         }),
     ),
+  )
+})
+
+// Push notifications from the "notify" and "digest" Edge Functions.
+self.addEventListener('push', (event) => {
+  let message = { title: 'Hisaab', body: 'Something changed in your hisaab', url: '#/' }
+  try {
+    message = { ...message, ...event.data.json() }
+  } catch {
+    // Not JSON: show the default text.
+  }
+  event.waitUntil(
+    self.registration.showNotification(message.title, {
+      body: message.body,
+      icon: 'icon-192.png',
+      badge: 'icon-192.png',
+      data: { url: message.url },
+      tag: message.url,
+    }),
+  )
+})
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const target = new URL(`./${event.notification.data?.url ?? ''}`, self.registration.scope).href
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windows) => {
+      const open = windows.find((w) => w.url.startsWith(self.registration.scope))
+      if (open) return open.navigate(target).then((w) => w?.focus())
+      return self.clients.openWindow(target)
+    }),
   )
 })

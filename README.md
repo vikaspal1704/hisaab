@@ -32,6 +32,40 @@ tiers: **GitHub Pages** for the app and **Supabase** for the database and login.
 - Split equally, by exact amounts, or by shares. Several people can pay one bill. Dark mode
   works too.
 
+### Made for how friends actually deal with money
+
+Built around common complaints: logging feels like a chore, friends won't install yet
+another app, and asking for money back is awkward.
+
+- **Baari (take turns).** "Aaj maine diya, kal tu de." For each friend you choose baari or
+  exact. In baari mode Hisaab shows whose turn it is ("Rahul's baari next") instead of debts.
+- **Close enough is even.** Each friend or group has a tolerance (₹100 by default). Inside
+  it, the balance shows "barabar 👍" and nobody is chased for ₹37.
+- **Chhod do 🙏.** Let go of what someone owes you. It's recorded as a gift, so the passbook
+  stays honest.
+- **Two-tap logging.** "Add again" on any entry, shortcuts for regular outings on the home
+  screen, and the split options stay folded away when it's just "split equally, I paid".
+- **Log straight from UPI.** Paste the GPay, PhonePe, Paytm or bank SMS message and Hisaab
+  fills in the amount and the friend. On Android, the installed app also appears in the
+  Share menu, so you can share a payment message straight to it.
+- **Lent or borrowed.** "I gave Amit ₹200 for petrol" in one step, without a bill split.
+- **No-install share link.** Send a friend a private link to your passbook together. They see
+  every entry from their side and can 👍 or ❓ it without signing up. You can turn the link off.
+- **Confirm or question.** Entries someone else adds about you show up under "To check".
+  Questions are flagged for both people, and an edit resets the confirmations.
+- **The app does the asking.** Set a comfort limit per friend (e.g. above ₹500, after 14
+  quiet days). Hisaab suggests a light, Hinglish WhatsApp message framed as a turn, not a
+  debt, optionally with the share link.
+- **Treats.** Birthday and promotion treats are remembered (who gave, who came) but never
+  owed: "Rahul gave the last treat — next one's on you?"
+- **Trip kitty.** Everyone puts money in with one person, and spends come out of the kitty.
+  Hisaab tracks collected versus spent and what each person is owed back.
+- **Flatmates.** Rent, WiFi, cook or Netflix are added automatically every month, split equally.
+- **Notifications.** A push when a friend adds or changes something with you, plus a short
+  weekly summary (optional setup, below). Without it, changes still appear live, with an
+  unread badge.
+- **Hinglish.** Switch the whole app (and the share page) between English and Hinglish.
+
 ## How the ledger works
 
 - Money is stored as whole **paise** (integers), never floating point. Splits use the
@@ -47,8 +81,10 @@ tiers: **GitHub Pages** for the app and **Supabase** for the database and login.
   entries you are part of. All writes go through database functions that check every rule.
   Phone numbers of people who aren't your contacts are masked.
 
-The schema, rules and access control all live in
-[`supabase/migrations/20261012000000_init.sql`](supabase/migrations/20261012000000_init.sql).
+The schema, rules and access control live in [`supabase/migrations/`](supabase/migrations/):
+the core ledger in `20261012000000_init.sql` and the friendship features in
+`20261013000000_friendship_features.sql`. Share links are the only thing someone without an
+account can use, and only through two functions that require a valid, revocable token.
 
 ## Deploy for free (about 15 minutes)
 
@@ -60,7 +96,9 @@ You need a GitHub account, a Supabase account (free) and a Google Cloud account 
 1. Create a new project at [supabase.com](https://supabase.com) on the free plan. Pick the
    Mumbai region if your friends are in India.
 2. Open **SQL Editor** → **New query**, paste the whole contents of
-   `supabase/migrations/20261012000000_init.sql`, and click **Run**.
+   `supabase/migrations/20261012000000_init.sql`, and click **Run**. Then do the same with
+   `supabase/migrations/20261013000000_friendship_features.sql`, in that order. (If you already
+   ran the first file earlier, just run the second.)
 3. Open **Project Settings → API** and note the **Project URL** and the **anon / publishable
    key**. Both are meant to be public; Row Level Security protects the data.
 
@@ -92,6 +130,29 @@ Safari → Share → **Add to Home Screen**.
 Supabase pauses free projects after a week with no activity. The **Keep Supabase awake**
 workflow pings the database twice a week once the variables above are set. If a project does
 get paused, restore it from the Supabase dashboard; no data is lost.
+
+### Optional: push notifications and the weekly summary
+
+Everything else works without this; it adds phone notifications.
+
+1. Generate keys: `npx web-push generate-vapid-keys`.
+2. Install the [Supabase CLI](https://supabase.com/docs/guides/cli), then run `supabase login`
+   and `supabase link --project-ref <your-project-ref>` in this folder.
+3. Set the function secrets (pick any long random string for `HISAAB_SECRET`):
+   ```bash
+   supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... \
+     VAPID_SUBJECT=mailto:you@example.com HISAAB_SECRET=...
+   ```
+4. Deploy the two functions:
+   `supabase functions deploy notify --no-verify-jwt` and
+   `supabase functions deploy digest --no-verify-jwt`. They check `HISAAB_SECRET` themselves.
+5. In Supabase, open **Database → Webhooks** and create a webhook on table `entry_events`,
+   event **Insert**, of type **Supabase Edge Function** → `notify`, with the HTTP header
+   `x-hisaab-secret: <your HISAAB_SECRET>`.
+6. In GitHub, add the repository variable `VITE_VAPID_PUBLIC_KEY` (the public key) and the
+   repository **secret** `HISAAB_SECRET` (for the weekly summary workflow), then redeploy.
+   Each person turns notifications on under **Me → Notifications**. On iPhone this needs
+   iOS 16.4+ and Hisaab added to the home screen.
 
 ### Optional: SMS OTP login
 
@@ -127,7 +188,8 @@ CI runs all of this on every push.
 
 ```
 supabase/migrations/   database schema, rules (functions) and access policies
-src/lib/               pure logic: money, phone, split, settle, upi (unit tested)
+supabase/functions/    Edge Functions: push on new activity, weekly summary
+src/lib/               pure logic: money, phone, split, settle, baari, payment text, nudges, i18n
 src/pages/             screens (Home, Friend passbook, Add expense, Settle up, …)
 src/components/        shared UI
 tests/unit/            unit tests
@@ -138,7 +200,13 @@ tests/db/              integration tests for the SQL (balances, payments, RLS, a
 
 - With Google login, a phone number is claimed rather than verified. That's fine among
   friends, and a number can only be claimed once. Enable SMS OTP for verified numbers.
-- Payments can be deleted (and re-recorded) but not edited.
+- Payments, treats and "chhod do" entries can be deleted (and re-recorded) but not edited.
 - Group screens show the entries you're part of. Group balances only count expenses tagged
   to that group, so private debts between two members stay private.
-- Not done yet: push notifications, receipt photos, CSV export, and multiple currencies.
+- Logging from UPI reads text, not screenshots. GPay often shares an image, so use
+  "Paste the message" with the bank SMS or the text from the payment screen.
+- The phone contact picker is Android Chrome only (a browser limitation). On iPhone, type the
+  number.
+- Monthly bills are posted when a member opens the app on or after the due day.
+- Anyone holding a share link can see that one passbook until you turn the link off.
+- Not done yet: receipt photos, CSV export, and multiple currencies.

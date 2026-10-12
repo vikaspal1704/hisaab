@@ -7,7 +7,14 @@ import { Button, ErrorView, Field, LoadingView, SectionTitle, TextInput } from '
 import { useGroups, useLedgerMutation } from '../hooks/queries'
 import { api } from '../lib/api'
 import { friendlyError } from '../lib/errors'
-import type { Group } from '../lib/types'
+import { useT } from '../lib/i18n'
+import type { Group, GroupKind } from '../lib/types'
+
+const KINDS: { value: GroupKind; label: string; hint: string; emoji: string }[] = [
+  { value: 'friends', label: 'Friends hangout', hint: 'Take turns paying. Small differences count as even.', emoji: '🍻' },
+  { value: 'trip', label: 'Trip', hint: 'Exact splits, and an optional kitty everyone chips into.', emoji: '✈️' },
+  { value: 'home', label: 'Flat / home', hint: 'Exact splits, plus monthly bills like rent and WiFi.', emoji: '🏠' },
+]
 
 const EMOJIS = ['👥', '🍻', '🍕', '✈️', '🏠', '🏏', '🎉', '💼', '🎓', '🏖️']
 
@@ -24,16 +31,21 @@ function GroupForm({ existing }: { existing: Group | null }) {
   const navigate = useNavigate()
   const toast = useToast()
   const [name, setName] = useState(existing?.name ?? '')
-  const [emoji, setEmoji] = useState(existing?.emoji ?? '👥')
+  const { t } = useT()
+  const [emoji, setEmoji] = useState(existing?.emoji ?? '🍻')
+  const [kind, setKind] = useState<GroupKind>(existing?.kind ?? 'friends')
   const [selected, setSelected] = useState<Set<string>>(new Set(existing?.memberIds ?? []))
   const [error, setError] = useState<string | null>(null)
   const save = useLedgerMutation(async () => {
     if (existing) {
       const added = [...selected].filter((m) => !existing.memberIds.includes(m))
       await api.updateGroup(existing.id, name.trim(), emoji, added)
+      if (kind !== existing.kind) await api.setGroupPrefs(existing.id, kind, kind === 'friends' ? 10000 : 0, existing.kittyHolder)
       return existing.id
     }
-    return api.createGroup(name.trim(), emoji, [...selected])
+    const id = await api.createGroup(name.trim(), emoji, [...selected])
+    if (kind !== 'friends') await api.setGroupPrefs(id, kind, 0, null)
+    return id
   })
 
   const toggle = (personId: string) => {
@@ -45,11 +57,11 @@ function GroupForm({ existing }: { existing: Group | null }) {
   }
 
   const submit = () => {
-    if (!name.trim()) return setError('Give the group a name')
+    if (!name.trim()) return setError(t('Give the group a name'))
     setError(null)
     save.mutate(undefined, {
       onSuccess: (id) => {
-        toast(existing ? 'Group updated' : 'Group created')
+        toast(existing ? t('Group updated') : t('Group created'))
         navigate(`/g/${id}`, { replace: true })
       },
     })
@@ -57,22 +69,43 @@ function GroupForm({ existing }: { existing: Group | null }) {
 
   return (
     <Page
-      title={existing ? 'Edit group' : 'New group'}
+      title={existing ? t('Edit group') : t('New group')}
       back
       footer={
         <div className="pb-1">
           {error || save.error ? <p className="mb-2 text-center text-sm text-red-600">{error ?? friendlyError(save.error)}</p> : null}
           <Button block busy={save.isPending} onClick={submit}>
-            {existing ? 'Save' : `Create group${selected.size ? ` with ${selected.size + 1} people` : ''}`}
+            {existing ? t('Save') : selected.size ? t('Create group with {n} people', { n: selected.size + 1 }) : t('Create group')}
           </Button>
         </div>
       }
     >
       <div className="mt-2 space-y-4">
-        <Field label="Group name">
-          <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Friday gang, Goa 2026" maxLength={60} autoFocus={!existing} />
+        <Field label={t('Group name')}>
+          <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder={t('e.g. Friday gang, Goa 2026')} maxLength={60} autoFocus={!existing} />
         </Field>
-        <div className="flex gap-2 overflow-x-auto pb-1" role="radiogroup" aria-label="Icon">
+        <div role="radiogroup" aria-label={t('Type')} className="space-y-2">
+          {KINDS.map((k) => (
+            <button
+              key={k.value}
+              type="button"
+              role="radio"
+              aria-checked={kind === k.value}
+              onClick={() => {
+                setKind(k.value)
+                if (!existing) setEmoji(k.emoji)
+              }}
+              className={`flex w-full items-start gap-3 rounded-2xl p-3 text-left ring-1 ${kind === k.value ? 'bg-brand-50 ring-2 ring-brand-600 dark:bg-brand-800/30' : 'bg-white ring-slate-200 dark:bg-slate-900 dark:ring-slate-700'}`}
+            >
+              <span className="text-xl" aria-hidden>{k.emoji}</span>
+              <span>
+                <span className="block font-medium">{t(k.label)}</span>
+                <span className="block text-sm text-slate-500 dark:text-slate-400">{t(k.hint)}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1" role="radiogroup" aria-label={t('Icon')}>
           {EMOJIS.map((e) => (
             <button
               key={e}
@@ -87,7 +120,7 @@ function GroupForm({ existing }: { existing: Group | null }) {
           ))}
         </div>
       </div>
-      <SectionTitle>Members {existing ? '(add more)' : ''}</SectionTitle>
+      <SectionTitle>{existing ? t('Members (add more)') : t('Members')}</SectionTitle>
       <ContactChecklist selected={selected} onToggle={toggle} />
     </Page>
   )

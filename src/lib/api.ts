@@ -1,10 +1,18 @@
 import type { Paise } from './money'
 import type { Allocation } from './settle'
-import type { EntryPart, SplitMode } from './split'
+import type { EntryPart, SplitMode, SplitUnit } from './split'
 import { supabase } from './supabase'
 import type {
   ActivityRow,
   Balance,
+  ContactPrefs,
+  GroupKind,
+  Reaction,
+  RecurringRule,
+  ReviewRow,
+  SharedView,
+  Shortcut,
+  TreatSummary,
   EntryDetail,
   Group,
   GroupBalance,
@@ -79,10 +87,18 @@ export const api = {
   async groups(): Promise<Group[]> {
     const { data, error } = await supabase
       .from('groups')
-      .select('id, name, emoji, group_members(person_id)')
+      .select('id, name, emoji, kind, tolerance, kitty_holder, group_members(person_id)')
       .order('created_at', { ascending: false })
     if (error) throw error
-    return data.map((g) => ({ id: g.id, name: g.name, emoji: g.emoji, memberIds: g.group_members.map((m) => m.person_id) }))
+    return data.map((g) => ({
+      id: g.id,
+      name: g.name,
+      emoji: g.emoji,
+      kind: g.kind,
+      tolerance: num(g.tolerance),
+      kittyHolder: g.kitty_holder,
+      memberIds: g.group_members.map((m: { person_id: string }) => m.person_id),
+    }))
   },
 
   createGroup(name: string, emoji: string | null, memberIds: string[]) {
@@ -103,7 +119,8 @@ export const api = {
       .from('entries')
       .select(
         `id, kind, description, amount, occurred_on, group_id, split_mode, method, created_by, created_at,
-         updated_at, deleted_at, version,
+         updated_at, deleted_at, version, occasion, kitty,
+         reactions:entry_reactions(entry_id, person_id, status, note),
          parts:entry_parts(person_id, paid, owed, shares),
          allocations:entry_allocations(debtor:debtor_id, creditor:creditor_id, amount),
          lines:ledger_lines(debtor_id, creditor_id, amount),
@@ -120,6 +137,7 @@ export const api = {
       parts: d.parts.map((p) => ({ ...p, paid: num(p.paid), owed: num(p.owed), shares: p.shares == null ? null : num(p.shares) })),
       allocations: d.allocations.map((a) => ({ ...a, amount: num(a.amount) })),
       lines: d.lines.map((l) => ({ ...l, amount: num(l.amount) })),
+      reactions: d.reactions ?? [],
       events: [...d.events].sort((a, b) => a.id - b.id),
     }
   },
@@ -170,6 +188,177 @@ export const api = {
       p_group: args.groupId,
       p_expected_version: args.expectedVersion,
     })
+  },
+
+  async contactPrefs(): Promise<ContactPrefs[]> {
+    const { data, error } = await supabase
+      .from('contacts')
+      .select('person_id, style, tolerance, remind_above, remind_after_days, last_nudged_at')
+    if (error) throw error
+    return data.map((c) => ({ ...c, tolerance: num(c.tolerance), remind_above: num(c.remind_above) })) as ContactPrefs[]
+  },
+
+  setContactPrefs(personId: string, prefs: Pick<ContactPrefs, 'style' | 'tolerance' | 'remind_above' | 'remind_after_days'>) {
+    return rpc<void>('set_contact_prefs', {
+      p_person: personId,
+      p_style: prefs.style,
+      p_tolerance: prefs.tolerance,
+      p_remind_above: prefs.remind_above,
+      p_remind_after_days: prefs.remind_after_days,
+    })
+  },
+
+  markNudged(personId: string) {
+    return rpc<void>('mark_nudged', { p_person: personId })
+  },
+
+  setGroupPrefs(groupId: string, kind: GroupKind, tolerance: Paise, kittyHolder: string | null) {
+    return rpc<void>('set_group_prefs', { p_group: groupId, p_kind: kind, p_tolerance: tolerance, p_kitty_holder: kittyHolder })
+  },
+
+  forgive(personId: string, amount: Paise, note: string | null) {
+    return rpc<string>('forgive_balance', { p_other: personId, p_amount: amount, p_note: note })
+  },
+
+  saveTreat(args: { giver: string; amount: Paise; description: string; occasion: string | null; occurredOn: string; guests: string[]; groupId: string | null }) {
+    return rpc<string>('save_treat', {
+      p_giver: args.giver,
+      p_amount: args.amount,
+      p_description: args.description,
+      p_occasion: args.occasion,
+      p_occurred_on: args.occurredOn,
+      p_guests: args.guests,
+      p_group: args.groupId,
+    })
+  },
+
+  async treatSummary(personId: string): Promise<TreatSummary | null> {
+    const rows = await rpc<TreatSummary[]>('treat_summary', { p_other: personId })
+    const r = rows[0]
+    if (!r) return null
+    return { ...r, i_gave_amount: num(r.i_gave_amount), they_gave_amount: num(r.they_gave_amount) }
+  },
+
+  async shortcuts(): Promise<Shortcut[]> {
+    const { data, error } = await supabase.from('shortcuts').select('id, label, description, amount, group_id, units').order('created_at')
+    if (error) throw error
+    return data.map((s) => ({ ...s, amount: s.amount == null ? null : num(s.amount) })) as Shortcut[]
+  },
+
+  saveShortcut(label: string, description: string, amount: Paise | null, groupId: string | null, units: SplitUnit[]) {
+    return rpc<string>('save_shortcut', { p_label: label, p_description: description, p_amount: amount, p_group: groupId, p_units: units })
+  },
+
+  deleteShortcut(id: string) {
+    return rpc<void>('delete_shortcut', { p_id: id })
+  },
+
+  react(entryId: string, status: Reaction['status'], note: string | null) {
+    return rpc<void>('react_to_entry', { p_entry: entryId, p_status: status, p_note: note })
+  },
+
+  async reviews(): Promise<ReviewRow[]> {
+    const rows = await rpc<ReviewRow[]>('my_reviews')
+    return rows.map((r) => ({ ...r, amount: num(r.amount), my_delta: num(r.my_delta) }))
+  },
+
+  async reactionsFor(entryIds: string[]): Promise<Reaction[]> {
+    if (entryIds.length === 0) return []
+    const { data, error } = await supabase.from('entry_reactions').select('entry_id, person_id, status, note').in('entry_id', entryIds)
+    if (error) throw error
+    return data as Reaction[]
+  },
+
+  createShareLink(personId: string) {
+    return rpc<string>('create_share_link', { p_person: personId })
+  },
+
+  async activeShareLink(personId: string): Promise<string | null> {
+    const { data, error } = await supabase
+      .from('share_links')
+      .select('token')
+      .eq('person_id', personId)
+      .is('revoked_at', null)
+      .maybeSingle()
+    if (error) throw error
+    return data?.token ?? null
+  },
+
+  revokeShareLink(personId: string) {
+    return rpc<void>('revoke_share_link', { p_person: personId })
+  },
+
+  async sharedView(token: string): Promise<SharedView> {
+    const view = await rpc<SharedView>('shared_view', { p_token: token })
+    return {
+      ...view,
+      entries: view.entries.map((e) => ({ ...e, amount: num(e.amount), delta: num(e.delta), running: num(e.running) })),
+    }
+  },
+
+  sharedReact(token: string, entryId: string, status: Reaction['status'], note: string | null) {
+    return rpc<void>('shared_react', { p_token: token, p_entry: entryId, p_status: status, p_note: note })
+  },
+
+  addToKitty(groupId: string, from: string, amount: Paise, occurredOn: string, method: PaymentMethod) {
+    return rpc<string>('add_to_kitty', { p_group: groupId, p_from: from, p_amount: amount, p_occurred_on: occurredOn, p_method: method })
+  },
+
+  saveKittyExpense(args: { description: string; amount: Paise; occurredOn: string; groupId: string; splitMode: SplitMode; parts: EntryPart[] }) {
+    return rpc<string>('save_kitty_expense', {
+      p_description: args.description,
+      p_amount: args.amount,
+      p_occurred_on: args.occurredOn,
+      p_group: args.groupId,
+      p_split_mode: args.splitMode,
+      p_parts: args.parts,
+    })
+  },
+
+  async groupKitty(groupId: string): Promise<{ holder_id: string | null; collected: Paise; spent: Paise } | null> {
+    const rows = await rpc<{ holder_id: string | null; collected: Paise; spent: Paise }[]>('group_kitty', { p_group: groupId })
+    const r = rows[0]
+    return r ? { ...r, collected: num(r.collected), spent: num(r.spent) } : null
+  },
+
+  async recurring(groupId: string): Promise<RecurringRule[]> {
+    const { data, error } = await supabase
+      .from('recurring_rules')
+      .select('id, group_id, description, amount, split_mode, parts, day_of_month, next_on, active')
+      .eq('group_id', groupId)
+      .eq('active', true)
+      .order('day_of_month')
+    if (error) throw error
+    return data.map((r) => ({ ...r, amount: num(r.amount) })) as RecurringRule[]
+  },
+
+  saveRecurring(args: { groupId: string; description: string; amount: Paise; splitMode: SplitMode; parts: EntryPart[]; dayOfMonth: number; startOn: string }) {
+    return rpc<string>('save_recurring', {
+      p_id: null,
+      p_group: args.groupId,
+      p_description: args.description,
+      p_amount: args.amount,
+      p_split_mode: args.splitMode,
+      p_parts: args.parts,
+      p_day_of_month: args.dayOfMonth,
+      p_start_on: args.startOn,
+    })
+  },
+
+  stopRecurring(id: string) {
+    return rpc<void>('stop_recurring', { p_id: id })
+  },
+
+  runDueRecurring() {
+    return rpc<number>('run_due_recurring')
+  },
+
+  savePushSubscription(endpoint: string, p256dh: string, auth: string) {
+    return rpc<void>('save_push_subscription', { p_endpoint: endpoint, p_p256dh: p256dh, p_auth: auth })
+  },
+
+  deletePushSubscription(endpoint: string) {
+    return rpc<void>('delete_push_subscription', { p_endpoint: endpoint })
   },
 
   deleteEntry(id: string) {

@@ -1,6 +1,9 @@
 import type { Paise } from './money'
 import type { Allocation } from './settle'
-import type { EntryPart, SplitMode } from './split'
+import type { Style } from './baari'
+import type { EntryPart, SplitMode, SplitUnit } from './split'
+
+export type EntryKind = 'expense' | 'payment' | 'forgive' | 'treat'
 
 export interface Person {
   id: string
@@ -25,11 +28,94 @@ export interface Household {
   memberIds: string[]
 }
 
+export type GroupKind = 'friends' | 'trip' | 'home'
+
 export interface Group {
   id: string
   name: string
   emoji: string | null
   memberIds: string[]
+  kind: GroupKind
+  tolerance: Paise
+  kittyHolder: string | null
+}
+
+export interface ContactPrefs {
+  person_id: string
+  style: Style
+  tolerance: Paise
+  remind_above: Paise
+  remind_after_days: number
+  last_nudged_at: string | null
+}
+
+export interface ReviewRow {
+  entry_id: string
+  state: 'pending' | 'questioned'
+  kind: EntryKind
+  description: string
+  amount: Paise
+  occurred_on: string
+  actor_id: string
+  at: string
+  my_delta: Paise
+  questioned_by: string | null
+  question_note: string | null
+}
+
+export interface Reaction {
+  entry_id: string
+  person_id: string
+  status: 'confirmed' | 'questioned'
+  note: string | null
+}
+
+export interface Shortcut {
+  id: string
+  label: string
+  description: string
+  amount: Paise | null
+  group_id: string | null
+  units: SplitUnit[]
+}
+
+export interface TreatSummary {
+  i_gave: number
+  i_gave_amount: Paise
+  they_gave: number
+  they_gave_amount: Paise
+  last_giver: string | null
+  last_on: string | null
+}
+
+export interface RecurringRule {
+  id: string
+  group_id: string
+  description: string
+  amount: Paise
+  split_mode: SplitMode
+  parts: EntryPart[]
+  day_of_month: number
+  next_on: string
+  active: boolean
+}
+
+export interface SharedView {
+  owner_name: string
+  owner_upi: string | null
+  friend_name: string
+  friend_registered: boolean
+  entries: {
+    entry_id: string
+    kind: EntryKind
+    description: string
+    occurred_on: string
+    amount: Paise
+    /** from the friend's point of view: positive = owner owes the friend */
+    delta: Paise
+    running: Paise
+    reaction: Reaction['status'] | null
+  }[]
 }
 
 export interface GroupBalance {
@@ -42,7 +128,7 @@ export interface GroupBalance {
 
 export interface LedgerRow {
   entry_id: string
-  kind: 'expense' | 'payment'
+  kind: EntryKind
   description: string
   occurred_on: string
   created_at: string
@@ -58,7 +144,7 @@ export interface ActivityRow {
   actor_id: string
   at: string
   entry_id: string
-  kind: 'expense' | 'payment'
+  kind: EntryKind
   description: string
   amount: Paise
   occurred_on: string
@@ -68,7 +154,9 @@ export interface ActivityRow {
 
 export interface EntryDetail {
   id: string
-  kind: 'expense' | 'payment'
+  kind: EntryKind
+  occasion: string | null
+  kitty: boolean
   description: string
   amount: Paise
   occurred_on: string
@@ -84,6 +172,7 @@ export interface EntryDetail {
   allocations: Allocation[]
   lines: { debtor_id: string; creditor_id: string; amount: Paise }[]
   events: { id: number; actor_id: string; action: ActivityRow['action']; created_at: string; before: unknown }[]
+  reactions: Reaction[]
 }
 
 export type PaymentMethod = 'cash' | 'upi' | 'bank' | 'other'

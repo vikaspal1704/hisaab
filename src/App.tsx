@@ -1,4 +1,5 @@
-import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from './auth/AuthProvider'
 import { BottomNav } from './components/BottomNav'
 import { ErrorView, LoadingView } from './components/ui'
@@ -22,6 +23,10 @@ import { OnboardingPage } from './pages/Onboarding'
 import { ProfilePage } from './pages/Profile'
 import { SettleUpPage } from './pages/SettleUp'
 import { SetupNeededPage } from './pages/SetupNeeded'
+import { SharedPage } from './pages/Shared'
+import { TreatPage } from './pages/Treat'
+import { useRecurringRunner } from './hooks/useRecurringRunner'
+import { takeSharedText } from './lib/shareTarget'
 
 const NAV_ROUTES = ['/', '/groups', '/activity', '/me']
 
@@ -29,9 +34,27 @@ export function App() {
   const { session, loading } = useAuth()
   const me = useMyPersonId(Boolean(session))
   const location = useLocation()
-  useLiveUpdates(Boolean(session && me.data))
+  const navigate = useNavigate()
+  const signedIn = Boolean(session && me.data)
+  useLiveUpdates(signedIn)
+  useRecurringRunner(signedIn)
+
+  // Text shared into the app (e.g. a UPI payment confirmation) opens Add expense.
+  useEffect(() => {
+    if (!signedIn) return
+    const text = takeSharedText()
+    if (text) navigate(`/add?paste=${encodeURIComponent(text)}`)
+  }, [signedIn, navigate])
 
   if (!isConfigured) return <SetupNeededPage />
+  // Share links work without an account.
+  if (location.pathname.startsWith('/s/')) {
+    return (
+      <Routes>
+        <Route path="/s/:token" element={<SharedPage />} />
+      </Routes>
+    )
+  }
   if (loading) return <LoadingView />
   if (!session) return <LoginPage />
   if (me.isPending) return <LoadingView />
@@ -57,6 +80,7 @@ export function App() {
         <Route path="/e/:id" element={<EntryPage />} />
         <Route path="/e/:id/edit" element={<ExpenseFormPage />} />
         <Route path="/settle/:kind/:id" element={<SettleUpPage />} />
+        <Route path="/treat" element={<TreatPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {NAV_ROUTES.includes(location.pathname) ? <BottomNav /> : null}

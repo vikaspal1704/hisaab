@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { IconActivity } from '../components/icons'
 import { toneClass } from '../components/Money'
@@ -6,21 +7,28 @@ import { Card, EmptyState, ErrorView, LoadingView } from '../components/ui'
 import { useActivity, usePeople } from '../hooks/queries'
 import { friendlyError } from '../lib/errors'
 import { formatRelative } from '../lib/format'
+import { useT } from '../lib/i18n'
 import { formatINR } from '../lib/money'
+import { markActivitySeen } from '../hooks/useUnread'
 import type { ActivityRow } from '../lib/types'
 
 export function ActivityPage() {
   const activity = useActivity()
   const people = usePeople()
+  const { t } = useT()
+  const newest = activity.data?.[0]?.event_id
+  useEffect(() => {
+    if (newest) markActivitySeen(newest)
+  }, [newest])
 
   return (
-    <Page title="Activity" withNav>
+    <Page title={t('Activity')} withNav>
       {activity.isPending || people.isPending ? (
         <LoadingView />
       ) : activity.error ? (
         <ErrorView message={friendlyError(activity.error)} onRetry={() => activity.refetch()} />
       ) : activity.data.length === 0 ? (
-        <EmptyState icon={<IconActivity size={40} />} title="Nothing yet" body="Every expense, payment, edit and delete involving you shows up here." />
+        <EmptyState icon={<IconActivity size={40} />} title={t('Nothing yet')} body={t('Every expense, payment, edit and delete involving you shows up here.')} />
       ) : (
         <Card className="mt-2 divide-y divide-slate-100 overflow-hidden dark:divide-slate-800">
           {activity.data.map((row) => (
@@ -32,22 +40,30 @@ export function ActivityPage() {
   )
 }
 
-function effectText(row: ActivityRow) {
-  if (row.is_deleted) return { text: 'no longer counts', net: 0 }
-  if (row.my_delta === 0) return { text: row.kind === 'payment' ? 'no change for you' : 'not involved', net: 0 }
-  const amount = formatINR(Math.abs(row.my_delta))
-  // Payments settle debts rather than create them, so they get a neutral colour.
-  if (row.kind === 'payment') return { text: row.my_delta > 0 ? `you paid ${amount}` : `you received ${amount}`, net: 0 }
-  return { text: row.my_delta > 0 ? `you get back ${amount}` : `you owe ${amount}`, net: row.my_delta }
+function useEffectText() {
+  const { t } = useT()
+  return (row: ActivityRow) => {
+    if (row.is_deleted) return { text: t('no longer counts'), net: 0 }
+    if (row.kind === 'treat') return { text: t('a treat 🎁 — nobody owes'), net: 0 }
+    if (row.my_delta === 0) return { text: row.kind === 'payment' ? t('no change for you') : t('not involved'), net: 0 }
+    const amount = formatINR(Math.abs(row.my_delta))
+    if (row.kind === 'forgive') return { text: row.my_delta > 0 ? t('{amount} let go for you 🙏', { amount }) : t('you let go {amount}', { amount }), net: 0 }
+    // Payments settle debts rather than create them, so they get a neutral colour.
+    if (row.kind === 'payment') return { text: row.my_delta > 0 ? t('you paid {amount}', { amount }) : t('you received {amount}', { amount }), net: 0 }
+    return { text: row.my_delta > 0 ? t('you get back {amount}', { amount }) : t('you owe {amount}', { amount }), net: row.my_delta }
+  }
 }
 
+const ICON: Record<string, string> = { expense: '🧾', payment: '🤝', forgive: '🙏', treat: '🎁' }
+
 function ActivityItem({ row, actor }: { row: ActivityRow; actor: string }) {
-  const effect = effectText(row)
-  const verb = { created: 'added', edited: 'edited', deleted: 'deleted', restored: 'restored' }[row.action]
+  const { t } = useT()
+  const effect = useEffectText()(row)
+  const verb = t({ created: 'added', edited: 'edited', deleted: 'deleted', restored: 'restored' }[row.action])
   return (
     <Link to={`/e/${row.entry_id}`} className="flex items-start gap-3 px-4 py-3 active:bg-slate-50 dark:active:bg-slate-800/60">
       <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-lg dark:bg-slate-800" aria-hidden>
-        {row.action === 'deleted' ? '🗑️' : row.kind === 'payment' ? '🤝' : '🧾'}
+        {row.action === 'deleted' ? '🗑️' : ICON[row.kind]}
       </span>
       <span className="min-w-0 flex-1">
         <span className="block">

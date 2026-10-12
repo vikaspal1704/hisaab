@@ -3,11 +3,13 @@ import { Page } from '../components/Page'
 import { ButtonLink, Card, EmptyState, ErrorView, LoadingView, Row } from '../components/ui'
 import { useGroups } from '../hooks/queries'
 import { friendlyError } from '../lib/errors'
+import { useT } from '../lib/i18n'
 
 export function GroupsPage() {
   const groups = useGroups()
+  const { t } = useT()
   return (
-    <Page title="Groups" withNav>
+    <Page title={t('Groups')} withNav>
       {groups.isPending ? (
         <LoadingView />
       ) : groups.error ? (
@@ -15,9 +17,9 @@ export function GroupsPage() {
       ) : groups.data.length === 0 ? (
         <EmptyState
           icon={<IconGroups size={40} />}
-          title="Groups are optional"
-          body="Make one for a crew you go out with or a trip. Hisaab then tells you whose turn it is to pay."
-          action={<ButtonLink to="/groups/new" block>Create a group</ButtonLink>}
+          title={t('Groups are optional')}
+          body={t('Make one for a crew you go out with, a trip or your flat. Hisaab then tells you whose baari it is.')}
+          action={<ButtonLink to="/groups/new" block>{t('Create a group')}</ButtonLink>}
         />
       ) : (
         <>
@@ -28,11 +30,11 @@ export function GroupsPage() {
                 to={`/g/${g.id}`}
                 leading={<span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-xl dark:bg-slate-800">{g.emoji ?? '👥'}</span>}
                 title={g.name}
-                subtitle={`${g.memberIds.length} people`}
+                subtitle={t('{n} people · {kind}', { n: g.memberIds.length, kind: t({ friends: 'Friends', trip: 'Trip', home: 'Flat / home' }[g.kind]) })}
               />
             ))}
           </Card>
-          <ButtonLink to="/groups/new" variant="secondary" block className="mt-4">Create a group</ButtonLink>
+          <ButtonLink to="/groups/new" variant="secondary" block className="mt-4">{t('Create a group')}</ButtonLink>
         </>
       )}
     </Page>

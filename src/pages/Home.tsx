@@ -1,13 +1,18 @@
-import { useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useMemo, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { Avatar, AvatarStack } from '../components/Avatar'
+import { LentSheet, NudgeSheet } from '../components/FriendSheets'
 import { IconUserPlus } from '../components/icons'
-import { BalanceLine } from '../components/Money'
+import { StyledBalance } from '../components/Money'
 import { HeaderButton, Page } from '../components/Page'
+import { ReviewCard } from '../components/Review'
 import { ButtonLink, Card, EmptyState, ErrorView, LoadingView, Row, SectionTitle } from '../components/ui'
-import { useBalances, useHouseholds, usePeople } from '../hooks/queries'
+import { useBalances, useContactPrefs, useHouseholds, usePeople, useReviews, useShortcuts } from '../hooks/queries'
+import { relationState, type Style } from '../lib/baari'
 import { friendlyError } from '../lib/errors'
+import { useT } from '../lib/i18n'
 import { formatINR, type Paise } from '../lib/money'
+import { shouldNudge } from '../lib/nudge'
 
 interface DashboardRow {
   key: string
@@ -15,43 +20,58 @@ interface DashboardRow {
   title: string
   subtitle?: string
   net: Paise
+  style: Style
+  tolerance: Paise
   avatar: { id: string; name: string }[]
 }
 
 export function HomePage() {
   const navigate = useNavigate()
+  const { t } = useT()
   const people = usePeople()
   const balances = useBalances()
   const households = useHouseholds()
+  const prefs = useContactPrefs()
+  const reviews = useReviews()
+  const shortcuts = useShortcuts()
+  const [nudging, setNudging] = useState<{ id: string; amount: Paise } | null>(null)
+  const [lending, setLending] = useState(false)
 
-  const { rows, owedToMe, iOwe } = useMemo(() => {
+  const { rows, owedToMe, iOwe, nextBaari, nudges } = useMemo(() => {
     const inHousehold = new Set<string>()
     const rows: DashboardRow[] = []
     for (const h of households.data ?? []) {
       const members = h.memberIds.filter((id) => !people.byId.get(id)?.is_me)
       members.forEach((id) => inHousehold.add(id))
+      const p = prefs.prefs(members[0] ?? '')
       rows.push({
         key: `h-${h.id}`,
         to: `/h/${h.id}`,
         title: h.name,
         subtitle: members.map((id) => people.name(id)).join(' · '),
         net: members.reduce((s, id) => s + balances.net(id), 0),
+        style: p.style,
+        tolerance: p.tolerance,
         avatar: members.map((id) => ({ id, name: people.name(id) })),
       })
     }
-    for (const p of people.list) {
-      if (p.is_me || inHousehold.has(p.id)) continue
-      if (!p.is_contact && !balances.byId.has(p.id)) continue
+    for (const person of people.list) {
+      if (person.is_me || inHousehold.has(person.id)) continue
+      if (!person.is_contact && !balances.byId.has(person.id)) continue
+      const p = prefs.prefs(person.id)
       rows.push({
-        key: p.id,
-        to: `/p/${p.id}`,
-        title: p.display_name,
-        subtitle: p.is_registered ? undefined : 'Not on Hisaab yet',
-        net: balances.net(p.id),
-        avatar: [{ id: p.id, name: p.display_name }],
+        key: person.id,
+        to: `/p/${person.id}`,
+        title: person.display_name,
+        subtitle: person.is_registered ? undefined : t('Not on Hisaab yet'),
+        net: balances.net(person.id),
+        style: p.style,
+        tolerance: p.tolerance,
+        avatar: [{ id: person.id, name: person.display_name }],
       })
     }
-    rows.sort((a, b) => Math.abs(b.net) - Math.abs(a.net) || a.title.localeCompare(b.title))
+    const isOpen = (r: DashboardRow) => relationState(r.net, r.style === 'baari' ? r.tolerance : 0).kind !== 'even'
+    rows.sort((a, b) => Number(isOpen(b)) - Number(isOpen(a)) || Math.abs(b.net) - Math.abs(a.net) || a.title.localeCompare(b.title))
 
     let owedToMe = 0
     let iOwe = 0
@@ -59,20 +79,26 @@ export function HomePage() {
       if (b.net > 0) owedToMe += b.net
       else iOwe -= b.net
     }
-    return { rows, owedToMe, iOwe }
-  }, [people, balances, households.data])
+    // My baari: people I'm behind with, beyond what counts as even.
+    const nextBaari = rows.filter((r) => r.style === 'baari' && relationState(r.net, r.tolerance).kind === 'i_owe')
+    const nudges = (balances.data ?? [])
+      .filter((b) => shouldNudge(b.net, b.last_activity, prefs.prefs(b.person_id)))
+      .map((b) => ({ id: b.person_id, amount: b.net }))
+    return { rows, owedToMe, iOwe, nextBaari, nudges }
+  }, [people, balances, households.data, prefs, t])
 
   const loading = people.isPending || balances.isPending || households.isPending
   const error = people.error ?? balances.error ?? households.error
-  const open = rows.filter((r) => r.net !== 0)
-  const settled = rows.filter((r) => r.net === 0)
+  const isOpen = (r: DashboardRow) => relationState(r.net, r.style === 'baari' ? r.tolerance : 0).kind !== 'even'
+  const open = rows.filter(isOpen)
+  const even = rows.filter((r) => !isOpen(r))
 
   return (
     <Page
       title="Hisaab"
       withNav
       actions={
-        <HeaderButton label="Add friend" onClick={() => navigate('/friends/new')}>
+        <HeaderButton label={t('Add friend')} onClick={() => navigate('/friends/new')}>
           <IconUserPlus />
         </HeaderButton>
       }
@@ -83,36 +109,58 @@ export function HomePage() {
         <ErrorView message={friendlyError(error)} onRetry={() => { people.refetch(); balances.refetch(); households.refetch() }} />
       ) : (
         <>
-          <Summary owedToMe={owedToMe} iOwe={iOwe} />
+          <Summary owedToMe={owedToMe} iOwe={iOwe} nextBaari={nextBaari.map((r) => r.title)} />
+          <QuickActions shortcuts={shortcuts.data ?? []} hasFriends={rows.length > 0} onLent={() => setLending(true)} />
+
+          <ReviewCard rows={reviews.data ?? []} />
+
+          {nudges.length > 0 ? (
+            <>
+              <SectionTitle>{t('Gentle reminders')}</SectionTitle>
+              <Card className="divide-y divide-slate-100 overflow-hidden dark:divide-slate-800">
+                {nudges.map((n) => (
+                  <Row
+                    key={n.id}
+                    onClick={() => setNudging(n)}
+                    leading={<span className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-lg dark:bg-amber-900/40">🔔</span>}
+                    title={t('Remind {name}', { name: people.name(n.id) })}
+                    subtitle={t('{amount} for a while — we’ll write it nicely', { amount: formatINR(n.amount) })}
+                  />
+                ))}
+              </Card>
+            </>
+          ) : null}
 
           {rows.length === 0 ? (
             <EmptyState
               icon={<IconUserPlus size={40} />}
-              title="Add your friends"
-              body="Add the people you go out with. When someone pays, add it here — Hisaab keeps the running total so you can just take turns."
-              action={<ButtonLink to="/friends/new" block>Add a friend</ButtonLink>}
+              title={t('Add your friends')}
+              body={t('Add the people you go out with. When someone pays, add it here — Hisaab keeps the running total so you can just take turns.')}
+              action={<ButtonLink to="/friends/new" block>{t('Add a friend')}</ButtonLink>}
             />
           ) : null}
 
           {open.length > 0 ? (
             <>
-              <SectionTitle>Balances</SectionTitle>
+              <SectionTitle>{t('Balances')}</SectionTitle>
               <Card className="divide-y divide-slate-100 overflow-hidden dark:divide-slate-800">
                 {open.map((r) => <DashboardItem key={r.key} row={r} />)}
               </Card>
             </>
           ) : null}
 
-          {settled.length > 0 ? (
+          {even.length > 0 ? (
             <>
-              <SectionTitle>All square</SectionTitle>
+              <SectionTitle>{t('All square')}</SectionTitle>
               <Card className="divide-y divide-slate-100 overflow-hidden dark:divide-slate-800">
-                {settled.map((r) => <DashboardItem key={r.key} row={r} />)}
+                {even.map((r) => <DashboardItem key={r.key} row={r} />)}
               </Card>
             </>
           ) : null}
         </>
       )}
+      {lending ? <LentSheet open onClose={() => setLending(false)} /> : null}
+      {nudging ? <NudgeSheet open onClose={() => setNudging(null)} personId={nudging.id} amount={nudging.amount} /> : null}
     </Page>
   )
 }
@@ -124,31 +172,56 @@ function DashboardItem({ row }: { row: DashboardRow }) {
       leading={row.avatar.length > 1 ? <AvatarStack people={row.avatar} /> : <Avatar id={row.avatar[0].id} name={row.avatar[0].name} />}
       title={row.title}
       subtitle={row.subtitle}
-      trailing={<BalanceLine net={row.net} they={row.avatar.length > 1 ? 'owe you' : 'owes you'} />}
+      trailing={<StyledBalance net={row.net} style={row.style} tolerance={row.tolerance} plural={row.avatar.length > 1} />}
       chevron={false}
     />
   )
 }
 
-function Summary({ owedToMe, iOwe }: { owedToMe: Paise; iOwe: Paise }) {
+function QuickActions({ shortcuts, hasFriends, onLent }: { shortcuts: { id: string; label: string }[]; hasFriends: boolean; onLent: () => void }) {
+  const { t } = useT()
+  if (!hasFriends) return null
+  const chip = 'flex min-h-10 shrink-0 items-center gap-1.5 rounded-full bg-white px-3.5 text-sm font-medium ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700'
+  return (
+    <div className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]" aria-label={t('Quick add')}>
+      {shortcuts.map((s) => (
+        <Link key={s.id} to={`/add?shortcut=${s.id}`} className={chip}>
+          ⚡ {s.label}
+        </Link>
+      ))}
+      <Link to="/add?paste=1" className={chip}>📋 {t('From UPI message')}</Link>
+      <Link to="/treat" className={chip}>🎁 {t('Treat')}</Link>
+      <button type="button" onClick={onLent} className={chip}>🤝 {t('Lent money')}</button>
+    </div>
+  )
+}
+
+function Summary({ owedToMe, iOwe, nextBaari }: { owedToMe: Paise; iOwe: Paise; nextBaari: string[] }) {
+  const { t } = useT()
   const net = owedToMe - iOwe
   const headline =
-    net > 0 ? `Overall, you are owed ${formatINR(net)}` : net < 0 ? `Overall, you owe ${formatINR(-net)}` : 'You’re all square'
+    net > 0
+      ? t('Overall, you are owed {amount}', { amount: formatINR(net) })
+      : net < 0
+        ? t('Overall, you owe {amount}', { amount: formatINR(-net) })
+        : t('You’re all square')
   return (
     <div className="mt-2 rounded-3xl bg-gradient-to-br from-brand-700 to-brand-800 p-5 text-white shadow-lg shadow-brand-900/20">
       <p className="text-lg font-semibold">{headline}</p>
       <div className="mt-4 grid grid-cols-2 gap-3">
         <div className="rounded-2xl bg-white/10 p-3">
-          <p className="text-xs text-brand-100">You’ll get back</p>
+          <p className="text-xs text-brand-100">{t('You’ll get back')}</p>
           <p className="mt-0.5 text-xl font-bold tabular-nums">{formatINR(owedToMe)}</p>
         </div>
         <div className="rounded-2xl bg-white/10 p-3">
-          <p className="text-xs text-brand-100">You owe</p>
+          <p className="text-xs text-brand-100">{t('You owe')}</p>
           <p className="mt-0.5 text-xl font-bold tabular-nums">{formatINR(iOwe)}</p>
         </div>
       </div>
-      {iOwe > 0 ? (
-        <p className="mt-3 text-sm text-brand-100">Tip: pick up the next bill with the people you owe — it balances out automatically.</p>
+      {nextBaari.length > 0 ? (
+        <p className="mt-3 text-sm text-brand-100">
+          {t('Your baari next with {names} — pick up the next bill and it evens out.', { names: nextBaari.slice(0, 3).join(', ') })}
+        </p>
       ) : null}
     </div>
   )

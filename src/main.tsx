@@ -5,7 +5,11 @@ import { HashRouter } from 'react-router-dom'
 import { App } from './App'
 import { AuthProvider } from './auth/AuthProvider'
 import { ToastProvider } from './components/Toast'
+import { I18nProvider } from './lib/i18n'
 import './index.css'
+import { captureSharedText } from './lib/shareTarget'
+
+captureSharedText()
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,11 +21,13 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <I18nProvider>
         <ToastProvider>
           <HashRouter>
             <App />
           </HashRouter>
         </ToastProvider>
+        </I18nProvider>
       </AuthProvider>
     </QueryClientProvider>
   </StrictMode>,

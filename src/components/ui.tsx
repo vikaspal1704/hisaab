@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
+import { useT } from '../lib/i18n'
 import { IconChevron } from './icons'
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
@@ -51,10 +52,11 @@ export function ButtonLink({ to, variant = 'primary', block, className = '', chi
 }
 
 export function Spinner({ className = '' }: { className?: string }) {
+  const { t } = useT()
   return (
     <span
       role="status"
-      aria-label="Loading"
+      aria-label={t('Loading')}
       className={`inline-block h-5 w-5 animate-spin rounded-full border-2 border-current border-r-transparent ${className}`}
     />
   )
@@ -186,11 +188,12 @@ export function LoadingView() {
 }
 
 export function ErrorView({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  const { t } = useT()
   return (
     <EmptyState
-      title="Couldn’t load this"
+      title={t('Couldn’t load this')}
       body={message}
-      action={onRetry ? <Button variant="secondary" block onClick={onRetry}>Try again</Button> : undefined}
+      action={onRetry ? <Button variant="secondary" block onClick={onRetry}>{t('Try again')}</Button> : undefined}
     />
   )
 }

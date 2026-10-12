@@ -1,3 +1,5 @@
+import { currentLang, translate } from './i18n'
+
 const MESSAGES: Record<string, string> = {
   profile_required: 'Finish setting up your profile first.',
   phone_taken: 'This number is already linked to another account.',
@@ -17,6 +19,13 @@ const MESSAGES: Record<string, string> = {
   household_size: 'A pair needs 2 to 6 people.',
   already_in_household: 'Someone here is already in another pair.',
   household_not_found: 'Pair not found.',
+  forgive_too_much: 'You can only let go of what they owe you.',
+  link_not_found: 'This link isn’t active any more.',
+  no_kitty: 'Start a kitty for this group first.',
+  holder_cannot_contribute: 'The kitty holder doesn’t need to add money in.',
+  kitty_payer: 'Kitty expenses are paid by the kitty holder.',
+  recurring_not_found: 'That monthly bill no longer exists.',
+  contacts_style: 'Pick baari or exact.',
   people_phone_format: 'That phone number doesn’t look right.',
   people_upi_format: 'That UPI ID doesn’t look right (e.g. name@okaxis).',
   people_name_length: 'Name must be 1–60 characters.',
@@ -30,6 +39,10 @@ export class InputError extends Error {}
 /** Turns a Supabase/Postgres error into something a person can act on. */
 export function friendlyError(error: unknown): string {
   if (error instanceof InputError) return error.message
+  return translate(currentLang(), englishError(error))
+}
+
+function englishError(error: unknown): string {
   const text =
     error && typeof error === 'object' && 'message' in error ? String((error as { message: unknown }).message) : String(error)
   for (const [code, message] of Object.entries(MESSAGES)) if (text.includes(code)) return message

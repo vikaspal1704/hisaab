@@ -19,6 +19,8 @@ export interface TestDb {
     sql: string,
     params?: unknown[],
   ): Promise<T[]>
+  /** Runs SQL as a bare database role with no signed-in user (e.g. "anon"). */
+  asRole<T extends pg.QueryResultRow = pg.QueryResultRow>(role: 'anon' | 'authenticated' | 'service_role', sql: string, params?: unknown[]): Promise<T[]>
   /** Runs SQL as the database owner (bypasses RLS). */
   admin<T extends pg.QueryResultRow = pg.QueryResultRow>(sql: string, params?: unknown[]): Promise<T[]>
   /** Creates an auth user and claims a profile for them. */
@@ -49,6 +51,18 @@ export async function createTestDb(): Promise<TestDb> {
         await client.query('set local role authenticated')
         const claims = user ? { sub: user.uid, phone: user.phone ?? '', role: 'authenticated' } : {}
         await client.query(`select set_config('request.jwt.claims', $1, true)`, [JSON.stringify(claims)])
+        const result = await client.query(sql, params)
+        await client.query('commit')
+        return result.rows
+      } catch (error) {
+        await client.query('rollback')
+        throw error
+      }
+    },
+    async asRole(role, sql, params = []) {
+      await client.query('begin')
+      try {
+        await client.query(`set local role ${role}`)
         const result = await client.query(sql, params)
         await client.query('commit')
         return result.rows

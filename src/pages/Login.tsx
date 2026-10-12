@@ -3,10 +3,12 @@ import { Button, Field, TextInput } from '../components/ui'
 import { friendlyError } from '../lib/errors'
 import { normalizePhone } from '../lib/phone'
 import { phoneOtpEnabled, supabase } from '../lib/supabase'
+import { useT } from '../lib/i18n'
 
 const redirectTo = () => window.location.origin + window.location.pathname
 
 export function LoginPage() {
+  const { t, lang, setLang } = useT()
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -23,25 +25,30 @@ export function LoginPage() {
   return (
     <div className="pt-safe mx-auto flex min-h-dvh max-w-lg flex-col px-6">
       <div className="flex flex-1 flex-col justify-center py-10">
-        <img src="./icon.svg" alt="" className="h-16 w-16" />
+        <div className="flex items-center justify-between">
+          <img src="./icon.svg" alt="" className="h-16 w-16" />
+          <button type="button" onClick={() => setLang(lang === 'hi' ? 'en' : 'hi')} className="min-h-9 rounded-full px-3 text-sm ring-1 ring-slate-300 dark:ring-slate-700">
+            {lang === 'hi' ? 'English' : 'Hinglish'}
+          </button>
+        </div>
         <h1 className="mt-6 text-3xl font-bold tracking-tight">Hisaab</h1>
         <p className="mt-2 text-lg text-slate-600 dark:text-slate-300">
-          Keep the books with your friends. No more splitting every bill — take turns paying, and Hisaab keeps it fair.
+          {t('Keep the books with your friends. No more splitting every bill — take turns paying, and Hisaab keeps it fair.')}
         </p>
         <ul className="mt-6 space-y-2 text-slate-600 dark:text-slate-300">
-          <li>✓ See who owes whom at a glance</li>
-          <li>✓ Pay the next bill to balance out</li>
-          <li>✓ Couples can settle together</li>
+          <li>✓ {t('Aaj maine diya, kal tu de — Hisaab remembers whose baari it is')}</li>
+          <li>✓ {t('Friends can check without installing anything')}</li>
+          <li>✓ {t('Couples can settle together')}</li>
         </ul>
       </div>
       <div className="pb-safe space-y-3 pb-6">
         {phoneOtpEnabled ? <PhoneLogin /> : null}
         <Button variant={phoneOtpEnabled ? 'secondary' : 'primary'} block busy={busy} onClick={google}>
-          <GoogleMark /> Continue with Google
+          <GoogleMark /> {t('Continue with Google')}
         </Button>
         {error ? <p className="text-center text-sm text-red-600">{error}</p> : null}
         <p className="text-center text-xs text-slate-500 dark:text-slate-400">
-          Friends find you by your phone number, which you add next.
+          {t('Friends find you by your phone number, which you add next.')}
         </p>
       </div>
     </div>
@@ -49,6 +56,7 @@ export function LoginPage() {
 }
 
 function PhoneLogin() {
+  const { t } = useT()
   const [phone, setPhone] = useState('')
   const [code, setCode] = useState('')
   const [sentTo, setSentTo] = useState<string | null>(null)
@@ -57,7 +65,7 @@ function PhoneLogin() {
 
   const send = async () => {
     const e164 = normalizePhone(phone)
-    if (!e164) return setError('Enter a valid mobile number')
+    if (!e164) return setError(t('Enter a valid mobile number'))
     setBusy(true)
     setError(null)
     const { error } = await supabase.auth.signInWithOtp({ phone: e164 })
@@ -72,22 +80,22 @@ function PhoneLogin() {
     setError(null)
     const { error } = await supabase.auth.verifyOtp({ phone: sentTo, token: code.trim(), type: 'sms' })
     setBusy(false)
-    if (error) setError('That code didn’t work. Check it and try again.')
+    if (error) setError(t('That code didn’t work. Check it and try again.'))
   }
 
   return (
     <div className="space-y-3">
       {sentTo ? (
-        <Field label={`Code sent to ${sentTo}`} error={error}>
-          <TextInput inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="6-digit code" />
+        <Field label={t('Code sent to {phone}', { phone: sentTo })} error={error}>
+          <TextInput inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} placeholder={t('6-digit code')} />
         </Field>
       ) : (
-        <Field label="Mobile number" error={error}>
+        <Field label={t('Mobile number')} error={error}>
           <TextInput type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="98765 43210" />
         </Field>
       )}
       <Button block busy={busy} onClick={sentTo ? verify : send}>
-        {sentTo ? 'Verify' : 'Send OTP'}
+        {sentTo ? t('Verify') : t('Send OTP')}
       </Button>
     </div>
   )

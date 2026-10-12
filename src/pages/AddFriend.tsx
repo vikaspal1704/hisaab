@@ -7,6 +7,7 @@ import { useLedgerMutation, usePeople } from '../hooks/queries'
 import { api } from '../lib/api'
 import { friendlyError, InputError } from '../lib/errors'
 import { normalizePhone } from '../lib/phone'
+import { useT } from '../lib/i18n'
 import { inviteText, whatsappLink } from '../lib/share'
 
 interface PickedContact {
@@ -22,6 +23,7 @@ const contactsApi = (navigator as Navigator & { contacts?: ContactsManager }).co
 
 export function AddFriendPage() {
   const navigate = useNavigate()
+  const { t } = useT()
   const people = usePeople()
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -31,8 +33,8 @@ export function AddFriendPage() {
 
   const addOne = async (rawName: string, rawPhone: string) => {
     const e164 = normalizePhone(rawPhone)
-    if (!rawName.trim()) throw new InputError('Enter a name')
-    if (!e164) throw new InputError(`“${rawPhone}” doesn’t look like a mobile number`)
+    if (!rawName.trim()) throw new InputError(t('Enter a name'))
+    if (!e164) throw new InputError(t('“{phone}” doesn’t look like a mobile number', { phone: rawPhone }))
     const id = await add.mutateAsync({ phone: e164, name: rawName.trim() })
     setAdded((list) => [...list.filter((a) => a.id !== id), { id, name: rawName.trim(), phone: e164 }])
   }
@@ -59,7 +61,7 @@ export function AddFriendPage() {
         try {
           await addOne(c.name?.[0] ?? '', tel ?? '')
         } catch (e) {
-          problems.push(`${c.name?.[0] ?? 'Contact'}: ${friendlyError(e)}`)
+          problems.push(`${c.name?.[0] ?? t('Contact')}: ${friendlyError(e)}`)
         }
       }
       if (problems.length) setError(problems.join('\n'))
@@ -71,22 +73,22 @@ export function AddFriendPage() {
   const registered = (id: string) => people.byId.get(id)?.is_registered
 
   return (
-    <Page title="Add friends" back>
+    <Page title={t('Add friends')} back>
       {contactsApi ? (
         <Button variant="secondary" block className="mt-2" onClick={pickFromContacts}>
-          <IconContacts /> Choose from phone contacts
+          <IconContacts /> {t('Choose from phone contacts')}
         </Button>
       ) : null}
 
       <div className="mt-5 space-y-4">
-        <Field label="Name">
-          <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder="What you call them" maxLength={60} autoComplete="off" />
+        <Field label={t('Name')}>
+          <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder={t('What you call them')} maxLength={60} autoComplete="off" />
         </Field>
-        <Field label="Mobile number" hint="This is how Hisaab links you up when they join.">
+        <Field label={t('Mobile number')} hint={t('This is how Hisaab links you up when they join.')}>
           <TextInput type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="98765 43210" autoComplete="off" />
         </Field>
         {error ? <p className="text-sm whitespace-pre-line text-red-600">{error}</p> : null}
-        <Button block busy={add.isPending} onClick={submit}>Add friend</Button>
+        <Button block busy={add.isPending} onClick={submit}>{t('Add friend')}</Button>
       </div>
 
       {added.length > 0 ? (
@@ -95,11 +97,11 @@ export function AddFriendPage() {
             <div key={a.id} className="flex min-h-14 items-center gap-3 px-4 py-2">
               <span className="flex-1">
                 <span className="block font-medium">✓ {a.name}</span>
-                <span className="block text-xs text-slate-500">{registered(a.id) ? 'Already on Hisaab' : 'Not on Hisaab yet'}</span>
+                <span className="block text-xs text-slate-500">{registered(a.id) ? t('Already on Hisaab') : t('Not on Hisaab yet')}</span>
               </span>
               {!registered(a.id) ? (
                 <a href={whatsappLink(a.phone, inviteText(a.name))} target="_blank" rel="noreferrer" className="flex min-h-9 items-center gap-1 rounded-full bg-[#25D366]/15 px-3 text-sm font-semibold text-[#128C7E] dark:text-[#25D366]">
-                  <IconWhatsApp size={16} /> Invite
+                  <IconWhatsApp size={16} /> {t('Invite')}
                 </a>
               ) : null}
             </div>
@@ -108,12 +110,12 @@ export function AddFriendPage() {
       ) : null}
       {added.length > 0 ? (
         <div className="mt-4 flex gap-3">
-          <ButtonLink to={`/add?with=${added.map((a) => a.id).join(',')}`} variant="secondary" className="flex-1">Add expense</ButtonLink>
-          <Button className="flex-1" onClick={() => navigate('/')}>Done</Button>
+          <ButtonLink to={`/add?with=${added.map((a) => a.id).join(',')}`} variant="secondary" className="flex-1">{t('Add expense')}</ButtonLink>
+          <Button className="flex-1" onClick={() => navigate('/')}>{t('Done')}</Button>
         </div>
       ) : (
         <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400">
-          Friends don’t need the app to start. Add them now — when they sign up with this number, they’ll see everything.
+          {t('Friends don’t need the app to start. Add them now — when they sign up with this number, they’ll see everything.')}
         </p>
       )}
     </Page>

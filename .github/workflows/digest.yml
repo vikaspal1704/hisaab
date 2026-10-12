@@ -1,0 +1,21 @@
+# Sends everyone with notifications on a short weekly summary (Sunday evening IST).
+# Needs: repository variable VITE_SUPABASE_URL and secret HISAAB_SECRET
+# (the same value set as the Edge Function secret).
+name: Weekly digest
+
+on:
+  schedule:
+    - cron: '23 13 * * 0'
+  workflow_dispatch:
+
+jobs:
+  digest:
+    runs-on: ubuntu-latest
+    if: ${{ vars.VITE_SUPABASE_URL != '' }}
+    steps:
+      - name: Trigger digest function
+        env:
+          SECRET: ${{ secrets.HISAAB_SECRET }}
+        run: |
+          if [ -z "$SECRET" ]; then echo "HISAAB_SECRET not set; skipping"; exit 0; fi
+          curl -sS -f -X POST "${{ vars.VITE_SUPABASE_URL }}/functions/v1/digest" -H "x-hisaab-secret: $SECRET"
