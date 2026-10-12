@@ -158,6 +158,15 @@ You need a GitHub account, a Supabase account (free) and a Google Cloud account 
 Share that link with your friends. On Android use Chrome's **Install app**; on iPhone use
 Safari → Share → **Add to Home Screen**.
 
+### Try it with demo data
+
+To see every feature without real friends, sign in to the app once and finish your profile,
+then run `supabase/demo/seed_demo.sql` in the Supabase SQL Editor. It adds demo friends,
+groups and two months of history to your account. The demo friends use fictional
++1 202-555-01xx numbers and can't sign in. The query ends by printing two links that show
+the hisaab from a friend's side without logging in. When you're done, run
+`supabase/demo/remove_demo.sql`: it removes all the demo data and leaves your own alone.
+
 ### Keeping it free and awake
 
 Supabase pauses free projects after a week with no activity. The **Keep Supabase awake**

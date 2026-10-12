@@ -74,7 +74,9 @@ export function GroupPage() {
         </div>
       ) : (
         <p className="mt-2 rounded-2xl bg-white p-4 text-center text-sm text-slate-500 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
-          {t('Everyone in this group is even. Anyone can pay next!')}
+          {group.kittyHolder
+            ? t('The kitty is open, so the holder looks behind. Close the kitty to settle everyone up.')
+            : t('Everyone in this group is even. Anyone can pay next!')}
         </p>
       )}
 

@@ -707,4 +707,5 @@ export const HINGLISH: Record<string, string> = {
   'A friend has already been keeping hisaab with this number. To link it to you, open the Hisaab link they sent you on WhatsApp (or ask them to tap “Invite” on your name), then sign in again.': 'Is number pe ek dost pehle se hisaab rakh raha hai. Use apne account se jodne ke liye, unka WhatsApp pe bheja Hisaab link kholo (ya unse kaho tumhare naam pe “Invite” dabayein), phir dobara sign in karo.',
   'Check the items: each needs a name, a price and at least one person.': 'Items check karo: har ek ka naam, daam aur kam se kam ek insaan chahiye.',
   'Swipe the table sideways to see every column →': 'Saare columns dekhne ke liye table ko side mein swipe karo →',
+  'The kitty is open, so the holder looks behind. Close the kitty to settle everyone up.': 'Kitty khuli hai, isliye rakhne wala peeche dikhta hai. Sabka hisaab karne ke liye kitty band karo.',
 }
