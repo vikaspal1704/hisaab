@@ -13,6 +13,7 @@ import { AddFriendPage } from './pages/AddFriend'
 import { EntryPage } from './pages/Entry'
 import { ExpenseFormPage } from './pages/ExpenseForm'
 import { FriendPage } from './pages/Friend'
+import { FriendsPage } from './pages/Friends'
 import { GroupPage } from './pages/Group'
 import { GroupFormPage } from './pages/GroupForm'
 import { GroupsPage } from './pages/Groups'
@@ -31,7 +32,7 @@ import { TreatPage } from './pages/Treat'
 import { useRecurringRunner } from './hooks/useRecurringRunner'
 import { takeSharedText } from './lib/shareTarget'
 
-const NAV_ROUTES = ['/', '/groups', '/activity', '/me']
+const NAV_ROUTES = ['/', '/friends', '/groups', '/activity', '/me']
 
 export function App() {
   const { session, loading } = useAuth()
@@ -76,6 +77,7 @@ export function App() {
         <Route path="/g/:id/edit" element={<GroupFormPage />} />
         <Route path="/activity" element={<ActivityPage />} />
         <Route path="/me" element={<ProfilePage />} />
+        <Route path="/friends" element={<FriendsPage />} />
         <Route path="/friends/new" element={<AddFriendPage />} />
         <Route path="/friends/import" element={<ImportContactsPage />} />
         <Route path="/p/:id" element={<FriendPage />} />

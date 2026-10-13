@@ -105,9 +105,16 @@ export function HomePage() {
       withNav
       wide
       actions={
-        <HeaderButton label={t('Add friend')} onClick={() => navigate('/friends/new')}>
-          <IconUserPlus />
-        </HeaderButton>
+        <>
+          <HeaderButton label={t('Add friend')} onClick={() => navigate('/friends/new')}>
+            <IconUserPlus />
+          </HeaderButton>
+          {people.me ? (
+            <Link to="/me" aria-label={t('Me')} title={t('Me')} className="flex h-11 w-11 items-center justify-center rounded-full lg:hidden">
+              <Avatar id={people.me.id} name={people.me.display_name} size={34} />
+            </Link>
+          ) : null}
+        </>
       }
     >
       {loading ? (

@@ -40,6 +40,8 @@ export interface Group {
   kind: GroupKind
   tolerance: Paise
   kittyHolder: string | null
+  /** who made the group (only they can delete it) */
+  createdBy: string
   /** car pools: how trips are paid for, and the fare per rider or cost per trip */
   carpoolStyle: CarpoolStyle | null
   carpoolAmount: Paise | null

@@ -91,3 +91,7 @@ export const IconPiggy = (p: IconProps) => (
 export const IconCar = (p: IconProps) => (
   <svg {...base(p)}><path d="M5 17H3v-5l2-5h14l2 5v5h-2M5 12h14" /><circle cx="7.5" cy="17" r="2" /><circle cx="16.5" cy="17" r="2" /></svg>
 )
+export const IconUpload = (p: IconProps) => <svg {...base(p)}><path d="M12 15V3M7 8l5-5 5 5M5 21h14" /></svg>
+export const IconKeyboard = (p: IconProps) => (
+  <svg {...base(p)}><rect x="2" y="6" width="20" height="12" rx="2" /><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10" /></svg>
+)

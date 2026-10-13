@@ -160,3 +160,31 @@ export function toCandidates(raw: RawContact[], opts: { myPhone: string; existin
   }
   return [...byPhone.values()].sort((a, b) => a.name.localeCompare(b.name))
 }
+
+const PHONE_IN_TEXT = /(?:\+|00)?\d[\d\s().-]{6,}\d/g
+
+/**
+ * Reads names and numbers pasted as text: one per line ("Rahul - 98765 43210",
+ * "+91 98765 43210 Rahul") or a comma-separated list of numbers (e.g. copied
+ * from a WhatsApp group's info). A line with one number keeps the rest of the
+ * line as the name.
+ */
+export function parsePastedContacts(text: string): RawContact[] {
+  const contacts: RawContact[] = []
+  for (const line of text.split(/\r?\n/)) {
+    const phones = line.match(PHONE_IN_TEXT) ?? []
+    if (phones.length === 0) continue
+    if (phones.length > 1) {
+      for (const phone of phones) contacts.push({ name: '', phones: [phone] })
+      continue
+    }
+    const [phone] = phones as [string]
+    const name = line
+      .replace(phone, ' ')
+      .replace(/[~:|,;\-–—•*"'<>()[\]]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    contacts.push({ name, phones })
+  }
+  return contacts
+}

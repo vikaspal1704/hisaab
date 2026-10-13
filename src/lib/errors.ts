@@ -6,6 +6,9 @@ const MESSAGES: Record<string, string> = {
   phone_mismatch: 'Use the same number you signed in with.',
   phone_needs_invite:
     'A friend has already been keeping hisaab with this number. To link it to you, open the Hisaab link they sent you on WhatsApp (or ask them to tap “Invite” on your name), then sign in again.',
+  only_group_creator: 'Only the person who created this group can delete it.',
+  creator_cannot_leave: 'You created this group — delete it instead of leaving.',
+  settle_before_leaving: 'Settle up in this group first (and hand over the kitty if you hold it), then you can leave.',
   not_a_carpool: 'Set this group up as a car pool first (edit the group).',
   invalid_trip: 'Pick a driver and at least one rider (the driver can’t also be a rider).',
   trip_already_logged: 'That ride is already logged. Undo it first to change it.',

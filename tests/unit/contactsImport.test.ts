@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseContactsCsv, parseContactsFile, parseVCard, toCandidates } from '../../src/lib/contactsImport'
+import { parseContactsCsv, parseContactsFile, parsePastedContacts, parseVCard, toCandidates } from '../../src/lib/contactsImport'
 
 const VCF = [
   'BEGIN:VCARD',
@@ -74,5 +74,27 @@ describe('toCandidates', () => {
       { myPhone: '', existingPhones: new Set() },
     )
     expect(rows).toEqual([{ name: 'Asha', phone: '+919877777777', status: 'new' }])
+  })
+})
+
+describe('parsePastedContacts', () => {
+  it('reads one person per line in common shapes', () => {
+    const text = ['Rahul Verma - 98765 43210', '+91 99887 76655 Priya', 'Amit: 080-1234-5678', '', 'no number here', '~ Neha • +91 91234 56789'].join('\n')
+    expect(parsePastedContacts(text)).toEqual([
+      { name: 'Rahul Verma', phones: ['98765 43210'] },
+      { name: 'Priya', phones: ['+91 99887 76655'] },
+      { name: 'Amit', phones: ['080-1234-5678'] },
+      { name: 'Neha', phones: ['+91 91234 56789'] },
+    ])
+  })
+
+  it('splits a comma-separated list of numbers, and the result cleans up like any import', () => {
+    const raw = parsePastedContacts('+91 98765 43210, +91 99887 76655, +91 98765 43210')
+    expect(raw).toHaveLength(3)
+    const rows = toCandidates(raw, { myPhone: '+919988776655', existingPhones: new Set() })
+    expect(rows).toEqual([
+      { name: '+919876543210', phone: '+919876543210', status: 'new' },
+      { name: '+919988776655', phone: '+919988776655', status: 'me' },
+    ])
   })
 })

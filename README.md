@@ -43,10 +43,16 @@ tiers: **GitHub Pages** for the app and **Supabase** for the database and login.
 - **Export.** Download any friend's passbook or a group's full statement as CSV (Excel, Google
   Sheets) or save it as a PDF. The group statement lists every entry with each member's effect
   and a closing balance.
-- **Import your contacts.** Pick many friends at once with the phone's contact picker (Android
-  Chrome), or import a `.vcf`/`.csv` export from iPhone, Android or Google Contacts. You tick who
-  to add and they're added in one go. Importing again later only offers new people, so it
-  works as a manual sync. The file is read on the phone; only the people you tick are saved.
+- **Friends tab and easy contact import.** A Friends tab lists everyone you keep hisaab with
+  (search, "on Hisaab" / "not yet" filter, one-tap WhatsApp invite). Its import card brings
+  people in four ways: the phone's contact picker (Android Chrome), a contacts file
+  (`.vcf`/`.csv`, with step-by-step export help for iPhone, Android and Google Contacts), a
+  pasted list of names and numbers (e.g. copied from a WhatsApp group), or typing a number.
+  You tick who to add in a second step. Importing again later only offers new people, so it
+  works as a manual sync. Contacts are read on the phone; only the people you tick are saved.
+- **Delete or leave a group.** The creator can delete a group: it disappears for everyone, but
+  its expenses and payments stay in everyone's balances and passbooks, so nobody's hisaab
+  changes. Anyone else can leave once they're settled up in it.
 - **Trustworthy books.** Entries are never silently changed. Every edit and delete is logged
   with the previous version, everyone on the entry sees it, and deletes can be undone.
 - Split equally, by exact amounts, or by shares. Several people can pay one bill. Dark mode
@@ -137,7 +143,8 @@ You need a GitHub account, a Supabase account (free) and a Google Cloud account 
    `supabase/migrations/20261014000000_bulk_contacts.sql`, then
    `supabase/migrations/20261015000000_office_and_kitty.sql`, then
    `supabase/migrations/20261016000000_items_search_invites.sql`, then
-   `supabase/migrations/20261017000000_carpool.sql`, in that order. If a file says
+   `supabase/migrations/20261017000000_carpool.sql`, then
+   `supabase/migrations/20261018000000_delete_group.sql`, in that order. If a file says
    something "already exists", it was run before: skip it and run the next one.
 3. Open **Project Settings → API** and note the **Project URL** and the **anon / publishable
    key**. Both are meant to be public; Row Level Security protects the data.

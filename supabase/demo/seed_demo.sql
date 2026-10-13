@@ -8,7 +8,7 @@
 --   so no real person can ever be linked to them. Their logins can't be used.
 -- * Remove it all again with supabase/demo/remove_demo.sql.
 --
--- Needs all six migrations in supabase/migrations.
+-- Needs all the migrations in supabase/migrations.
 
 -- Act as a given user for the RPCs below (they read auth.uid() from these claims).
 create or replace function pg_temp.act(p_uid uuid) returns void
@@ -255,6 +255,7 @@ begin
   end loop;
 
   -- Flat 302: rent and WiFi every month --------------------------------------------
+  perform pg_temp.act(me_uid);
   flat := public.create_group('Flat 302', '🏠', array[priya]);
   perform public.set_group_prefs(flat, 'home', 10000, null);
   perform public.save_recurring(null, flat, '📶 WiFi', 99900, 'equal', pg_temp.eq(me, 99900, array[me, priya]), 5, date_trunc('month', d)::date, 'monthly');

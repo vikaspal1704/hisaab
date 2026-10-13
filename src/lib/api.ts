@@ -112,6 +112,7 @@ export const api = {
       kind: g.kind,
       tolerance: num(g.tolerance),
       kittyHolder: g.kitty_holder,
+      createdBy: g.created_by,
       carpoolStyle: g.carpool_style ?? null,
       carpoolAmount: g.carpool_amount == null ? null : num(g.carpool_amount),
       memberIds: g.group_members.map((m: { person_id: string }) => m.person_id),
@@ -208,6 +209,15 @@ export const api = {
     )
     const nums = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, num(v)]))
     return rows.map((r) => ({ ...r, amount: num(r.amount), payers: nums(r.payers), effects: nums(r.effects) }))
+  },
+
+  /** Removes the group; its expenses stay in everyone's balances. Creator only. */
+  deleteGroup(groupId: string) {
+    return rpc<void>('delete_group', { p_group: groupId })
+  },
+
+  leaveGroup(groupId: string) {
+    return rpc<void>('leave_group', { p_group: groupId })
   },
 
   setCarpoolPrefs(groupId: string, style: CarpoolStyle, amount: Paise | null) {

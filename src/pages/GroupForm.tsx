@@ -3,8 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Page } from '../components/Page'
 import { ContactChecklist } from '../components/PeoplePicker'
 import { useToast } from '../components/Toast'
-import { Button, ErrorView, Field, LoadingView, SectionTitle, TextInput } from '../components/ui'
-import { useGroups, useLedgerMutation } from '../hooks/queries'
+import { IconTrash } from '../components/icons'
+import { Sheet } from '../components/Sheet'
+import { Button, Card, ErrorView, Field, LoadingView, SectionTitle, TextInput } from '../components/ui'
+import { useGroups, useLedgerMutation, usePeople } from '../hooks/queries'
 import { api } from '../lib/api'
 import { friendlyError, InputError } from '../lib/errors'
 import { parseRupees, toRupeeInput } from '../lib/money'
@@ -171,6 +173,51 @@ function GroupForm({ existing }: { existing: Group | null }) {
       </div>
       <SectionTitle>{existing ? t('Members (add more)') : t('Members')}</SectionTitle>
       <ContactChecklist selected={selected} onToggle={toggle} />
+      {existing ? <DangerZone group={existing} /> : null}
     </Page>
+  )
+}
+
+/** Delete (creator) or leave (everyone else). Money is never touched. */
+function DangerZone({ group }: { group: Group }) {
+  const { t } = useT()
+  const toast = useToast()
+  const navigate = useNavigate()
+  const me = usePeople().me
+  const [confirming, setConfirming] = useState(false)
+  const isCreator = me?.id === group.createdBy
+  const action = useLedgerMutation(() => (isCreator ? api.deleteGroup(group.id) : api.leaveGroup(group.id)))
+  const done = () => {
+    toast(isCreator ? t('Group deleted') : t('You left the group'))
+    navigate('/groups', { replace: true })
+  }
+  return (
+    <>
+      <SectionTitle>{isCreator ? t('Delete group') : t('Leave group')}</SectionTitle>
+      <Card className="p-4 text-sm">
+        <p className="text-slate-600 dark:text-slate-300">
+          {isCreator
+            ? t('The group goes away for everyone. Its expenses and payments stay in each person’s balance and passbook, so nobody’s hisaab changes. Repeating bills and car pool rides for it stop.')
+            : t('You’ll stop seeing this group. You can leave once you’re settled up in it; your past entries stay as they are.')}
+        </p>
+        <Button variant="danger" block className="mt-3" onClick={() => setConfirming(true)}>
+          <IconTrash size={18} /> {isCreator ? t('Delete “{name}”', { name: group.name }) : t('Leave “{name}”', { name: group.name })}
+        </Button>
+      </Card>
+      <Sheet open={confirming} onClose={() => setConfirming(false)} title={isCreator ? t('Delete this group?') : t('Leave this group?')}>
+        <p className="text-slate-600 dark:text-slate-300">
+          {isCreator
+            ? t('“{name}” will be removed for all {n} members. Balances stay exactly as they are.', { name: group.name, n: group.memberIds.length })
+            : t('“{name}” will disappear from your groups.', { name: group.name })}
+        </p>
+        {action.error ? <p className="mt-3 text-sm text-red-600">{friendlyError(action.error)}</p> : null}
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <Button variant="secondary" onClick={() => setConfirming(false)}>{t('Cancel')}</Button>
+          <Button variant="danger" busy={action.isPending} onClick={() => action.mutate(undefined, { onSuccess: done })}>
+            {isCreator ? t('Delete') : t('Leave')}
+          </Button>
+        </div>
+      </Sheet>
+    </>
   )
 }

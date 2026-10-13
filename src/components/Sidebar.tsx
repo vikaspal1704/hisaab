@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { Avatar } from './Avatar'
-import { IconActivity, IconGroups, IconHome, IconPlus, IconSearch, IconUser, IconUserPlus } from './icons'
+import { IconActivity, IconContacts, IconGroups, IconHome, IconPlus, IconSearch, IconUser } from './icons'
 import { useBalances, usePeople } from '../hooks/queries'
 import { useUnreadCount } from '../hooks/useUnread'
 import { useT } from '../lib/i18n'
@@ -71,6 +71,7 @@ export function Sidebar() {
 
       <nav aria-label={t('Main')} className="mt-6 flex flex-col gap-1">
         <NavLink to="/" end className={link}><IconHome size={20} /> {t('Home')}</NavLink>
+        <NavLink to="/friends" end className={link}><IconContacts size={20} /> {t('Friends')}</NavLink>
         <NavLink to="/groups" className={link}><IconGroups size={20} /> {t('Groups')}</NavLink>
         <NavLink to="/activity" className={link}>
           <IconActivity size={20} />
@@ -82,7 +83,6 @@ export function Sidebar() {
           ) : null}
         </NavLink>
         <NavLink to="/activity?search=1" className={() => link({ isActive: false })}><IconSearch size={20} /> {t('Search')}</NavLink>
-        <NavLink to="/friends/new" className={link}><IconUserPlus size={20} /> {t('Add friends')}</NavLink>
         <NavLink to="/me" className={link}><IconUser size={20} /> {t('Me')}</NavLink>
       </nav>
 
