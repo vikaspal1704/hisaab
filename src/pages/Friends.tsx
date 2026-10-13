@@ -38,7 +38,7 @@ export function FriendsPage() {
     const q = query.trim().toLowerCase()
     return friends
       .filter((p) => filter === 'all' || (filter === 'joined' ? p.is_registered : !p.is_registered))
-      .filter((p) => !q || p.display_name.toLowerCase().includes(q) || p.phone.includes(q.replace(/\s/g, '')))
+      .filter((p) => !q || p.display_name.toLowerCase().includes(q) || (p.phone ?? '').includes(q.replace(/\s/g, '')))
   }, [friends, filter, query])
   const waiting = friends.filter((p) => !p.is_registered).length
 
@@ -97,7 +97,7 @@ export function FriendsPage() {
                             <span className="min-w-0 flex-1">
                               <span className="block truncate font-medium">{p.display_name}</span>
                               <span className="block truncate text-sm text-slate-500 dark:text-slate-400">
-                                {p.is_registered ? formatPhone(p.phone) : t('Not on Hisaab yet')}
+                                {p.phone === null ? t('No number yet') : p.is_registered ? formatPhone(p.phone) : t('Not on Hisaab yet')}
                               </span>
                             </span>
                             {balances.byId.has(p.id) ? (

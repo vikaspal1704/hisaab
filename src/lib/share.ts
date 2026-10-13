@@ -10,9 +10,9 @@ export function appUrl(): string {
   return configured || window.location.origin + window.location.pathname
 }
 
-/** Opens WhatsApp with a prefilled message to a number. */
-export function whatsappLink(phoneE164: string, text: string): string {
-  return `https://wa.me/${phoneE164.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`
+/** Opens WhatsApp with a prefilled message to a number, or to a chat you pick when there's no number. */
+export function whatsappLink(phoneE164: string | null, text: string): string {
+  return `https://wa.me/${phoneE164 ? phoneE164.replace(/\D/g, '') : ''}?text=${encodeURIComponent(text)}`
 }
 
 /** The passbook link a friend can open without an account (it's also their invite). */
@@ -20,8 +20,9 @@ export function sharedUrl(token: string): string {
   return `${appUrl()}#/s/${token}`
 }
 
-export function inviteText(friendName: string, link: string): string {
-  return `Hey ${friendName}! I’m keeping our shared expenses on Hisaab so we don’t have to split every bill. Here’s our hisaab so far — no app needed: ${link}\n\nTap “Join” there and sign in with this number to add your own.`
+export function inviteText(friendName: string, link: string, toThisNumber = true): string {
+  const join = toThisNumber ? 'sign in with this number' : 'sign in with your number'
+  return `Hey ${friendName}! I’m keeping our shared expenses on Hisaab so we don’t have to split every bill. Here’s our hisaab so far — no app needed: ${link}\n\nTap “Join” there and ${join} to add your own.`
 }
 
 export function reminderText(friendName: string, amount: Paise, myUpi: string | null): string {

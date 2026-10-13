@@ -292,6 +292,9 @@ function ExpenseForm({
     return buildSplit({ amount, mode: state.mode, units: state.units, values, payers })
   }, [bill, amount, state.mode, state.units, state.values, payers])
 
+  // Logging a bill between other people ("Rahul paid for Priya") is fine: I just don't share it.
+  const iShare = state.units.some((u) => u.memberIds.includes(meId))
+  const iPay = (payers[meId] ?? 0) > 0
   const myPart = split.ok ? split.parts.find((p) => p.person_id === meId) : undefined
   const myNet = myPart ? myPart.paid - myPart.owed : 0
 
@@ -492,15 +495,17 @@ function ExpenseForm({
       >
         {group ? `${group.emoji ?? '👥'} ${group.name}` : t('Split between')}
       </SectionTitle>
-      <TurnHint
-        meId={meId}
-        groupId={state.groupId}
-        units={state.units}
-        balanceOf={balances.net}
-        name={people.name}
-        onPick={(id) => set({ payerMode: 'one', payerId: id })}
-        payerId={state.payerMode === 'one' ? state.payerId : null}
-      />
+      {iShare ? (
+        <TurnHint
+          meId={meId}
+          groupId={state.groupId}
+          units={state.units}
+          balanceOf={balances.net}
+          name={people.name}
+          onPick={(id) => set({ payerMode: 'one', payerId: id })}
+          payerId={state.payerMode === 'one' ? state.payerId : null}
+        />
+      ) : null}
       <Card className="divide-y divide-slate-100 dark:divide-slate-800">
         {state.units.length === 0 ? (
           <button type="button" onClick={() => setPicking(true)} className="w-full p-4 text-left text-slate-500">{t('Tap “Add people” to choose who shared this.')}</button>
@@ -540,6 +545,23 @@ function ExpenseForm({
           )
         })}
       </Card>
+      {state.units.length > 0 && !iShare ? (
+        <div role="note" className="mt-3 rounded-2xl bg-sky-50 p-3 text-sm text-sky-900 ring-1 ring-sky-200 dark:bg-sky-950/40 dark:text-sky-100 dark:ring-sky-900">
+          {iPay ? (
+            <>
+              <p>{t('You’re not sharing this, so they’ll owe you all of it.')}</p>
+              <p className="mt-1">{t('Adding it for someone else? Choose who paid.')}</p>
+              {!advanced ? (
+                <button type="button" onClick={() => setAdvanced(true)} className="mt-2 min-h-9 font-semibold text-brand-700 dark:text-brand-400">
+                  {t('Choose who paid')}
+                </button>
+              ) : null}
+            </>
+          ) : (
+            <p>{t('You’re adding this for others — it won’t change your balance. They’ll see it to check, and you can still edit it.')}</p>
+          )}
+        </div>
+      ) : null}
       {kittyHolder ? (
         <label className="mt-3 flex min-h-12 items-center gap-3 rounded-2xl bg-white px-4 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-800">
           <input type="checkbox" checked={fromKitty} onChange={(e) => setFromKitty(e.target.checked)} className="h-5 w-5 accent-brand-700" />
@@ -786,7 +808,7 @@ function ParticipantSheet({
 
   const friends = people.list
     .filter((p) => (p.is_contact || p.is_me) && allowed(p.id))
-    .filter((p) => !q || p.display_name.toLowerCase().includes(q) || p.phone.includes(q))
+    .filter((p) => !q || p.display_name.toLowerCase().includes(q) || (p.phone ?? '').includes(q))
     .sort((a, b) => Number(b.is_me) - Number(a.is_me) || a.display_name.localeCompare(b.display_name))
   const pairs = households
     .map((h) => ({ h, unit: householdUnit(h, meId) }))

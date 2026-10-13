@@ -143,6 +143,14 @@ export function EntryPage() {
         {e.kind === 'forgive' ? (
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">🙏 {t('Let go as a gift — chhod diya.')}</p>
         ) : null}
+        {!e.parts.some((p) => p.person_id === e.created_by) ? (
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
+            📝{' '}
+            {e.created_by === meId
+              ? t('You added this for them — it doesn’t change your balance.')
+              : t('Added by {name}, who isn’t part of it.', { name: people.name(e.created_by) })}
+          </p>
+        ) : null}
       </div>
 
       {!deleted && meId ? (

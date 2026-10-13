@@ -17,14 +17,17 @@ export function AddFriendPage() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [added, setAdded] = useState<{ id: string; name: string; phone: string }[]>([])
+  const [added, setAdded] = useState<{ id: string; name: string; phone: string | null }[]>([])
   const [inviting, setInviting] = useState<string | null>(null)
-  const add = useLedgerMutation((args: { phone: string; name: string }) => api.addContact(args.phone, args.name))
+  const add = useLedgerMutation((args: { phone: string | null; name: string }) =>
+    args.phone ? api.addContact(args.phone, args.name) : api.addContactByName(args.name),
+  )
 
   const addOne = async (rawName: string, rawPhone: string) => {
-    const e164 = normalizePhone(rawPhone)
+    // No number is fine: they can be given one later from their page.
+    const e164 = rawPhone.trim() ? normalizePhone(rawPhone) : null
     if (!rawName.trim()) throw new InputError(t('Enter a name'))
-    if (!e164) throw new InputError(t('“{phone}” doesn’t look like a mobile number', { phone: rawPhone }))
+    if (rawPhone.trim() && !e164) throw new InputError(t('“{phone}” doesn’t look like a mobile number', { phone: rawPhone }))
     const id = await add.mutateAsync({ phone: e164, name: rawName.trim() })
     setAdded((list) => [...list.filter((a) => a.id !== id), { id, name: rawName.trim(), phone: e164 }])
   }
@@ -53,7 +56,10 @@ export function AddFriendPage() {
         <Field label={t('Name')}>
           <TextInput value={name} onChange={(e) => setName(e.target.value)} placeholder={t('What you call them')} maxLength={60} autoComplete="off" />
         </Field>
-        <Field label={t('Mobile number')} hint={t('This is how Hisaab links you up when they join.')}>
+        <Field
+          label={t('Mobile number (optional)')}
+          hint={t('This is how Hisaab links you up when they join. Don’t have it? Add just the name — you can add the number later.')}
+        >
           <TextInput type="tel" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="98765 43210" autoComplete="off" />
         </Field>
         {error ? <p className="text-sm whitespace-pre-line text-red-600">{error}</p> : null}
@@ -66,7 +72,9 @@ export function AddFriendPage() {
             <div key={a.id} className="flex min-h-14 items-center gap-3 px-4 py-2">
               <span className="flex-1">
                 <span className="block font-medium">✓ {a.name}</span>
-                <span className="block text-xs text-slate-500">{registered(a.id) ? t('Already on Hisaab') : t('Not on Hisaab yet')}</span>
+                <span className="block text-xs text-slate-500">
+                  {a.phone === null ? t('No number yet') : registered(a.id) ? t('Already on Hisaab') : t('Not on Hisaab yet')}
+                </span>
               </span>
               {!registered(a.id) ? (
                 <button type="button" onClick={() => setInviting(a.id)} className="flex min-h-9 items-center gap-1 rounded-full bg-[#25D366]/15 px-3 text-sm font-semibold text-[#128C7E] dark:text-[#25D366]">

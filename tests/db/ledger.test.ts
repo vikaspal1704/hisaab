@@ -186,12 +186,14 @@ describe('expenses', () => {
     const [c, d] = await friends('V4', 'V5')
     await addContact(a, c)
     await addContact(a, d)
+    // Logging an expense between two friends (without yourself) is allowed;
+    // see on_behalf.test.ts. Strangers still aren't.
     await expect(
-      expense(a, 100, [
-        { person_id: c.personId, paid: 100, owed: 50 },
+      expense(c, 100, [
+        { person_id: a.personId, paid: 100, owed: 50 },
         { person_id: d.personId, paid: 0, owed: 50 },
       ]),
-    ).rejects.toThrow(/must_participate/)
+    ).rejects.toThrow(/unknown_person/)
   })
 
   it('keeps an audit trail of edits and rejects stale edits', async () => {

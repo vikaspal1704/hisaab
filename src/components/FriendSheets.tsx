@@ -7,7 +7,7 @@ import { todayISO } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { formatINR, parseRupees, toRupeeInput, type Paise } from '../lib/money'
 import { nudgeMessage, type Tone } from '../lib/nudge'
-import { formatPhone } from '../lib/phone'
+import { formatPhone, normalizePhone } from '../lib/phone'
 import { inviteText, sharedUrl, whatsappLink } from '../lib/share'
 import type { ContactPrefs } from '../lib/types'
 import { Sheet } from './Sheet'
@@ -295,6 +295,60 @@ export function FriendSettingsSheet({
   )
 }
 
+/**
+ * Gives a friend added by name their number. If someone already has that
+ * number in Hisaab, the two become one and `onDone` gets the surviving id.
+ */
+export function AddNumberSheet({
+  open,
+  onClose,
+  personId,
+  onDone,
+}: {
+  open: boolean
+  onClose: () => void
+  personId: string
+  onDone: (personId: string) => void
+}) {
+  const { t } = useT()
+  const toast = useToast()
+  const people = usePeople()
+  const [phone, setPhone] = useState('')
+  const save = useLedgerMutation(async () => {
+    const e164 = normalizePhone(phone)
+    if (!e164) throw new InputError(t('Enter a valid mobile number'))
+    return api.setContactPhone(personId, e164)
+  })
+  const name = people.name(personId)
+  return (
+    <Sheet open={open} onClose={onClose} title={t('Add {name}’s number', { name })}>
+      <form
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault()
+          save.mutate(undefined, {
+            onSuccess: (id) => {
+              toast(t('Number added'))
+              onDone(id)
+            },
+          })
+        }}
+      >
+        <Field
+          label={t('Mobile number')}
+          hint={t('If {name} is already on Hisaab (or in someone’s hisaab) with this number, everything joins up.', { name })}
+        >
+          <TextInput type="tel" inputMode="tel" autoComplete="tel" autoFocus placeholder="98765 43210" value={phone} onChange={(e) => setPhone(e.target.value)} />
+        </Field>
+        {save.error ? <p className="text-sm text-red-600">{friendlyError(save.error)}</p> : null}
+        <Button block type="submit" busy={save.isPending}>
+          {t('Save number')}
+        </Button>
+      </form>
+    </Sheet>
+  )
+}
+
 /** Share our passbook with a friend who doesn't have the app. */
 export function ShareSheet({ open, onClose, personId }: { open: boolean; onClose: () => void; personId: string }) {
   const { t } = useT()
@@ -373,14 +427,16 @@ export function InviteSheet({ open, onClose, personId }: { open: boolean; onClos
   }, [open, token, creatingLink, isError, createLink])
 
   if (!person) return null
-  const message = token ? inviteText(person.display_name.split(' ')[0], sharedUrl(token)) : ''
+  const message = token ? inviteText(person.display_name.split(' ')[0], sharedUrl(token), person.phone !== null) : ''
   return (
     <Sheet open={open} onClose={onClose} title={t('Invite {name}', { name: person.display_name })}>
       <div className="space-y-4">
         <p className="text-sm text-slate-600 dark:text-slate-300">
-          {t('They can see your hisaab from the link without signing up. When they join with {phone}, everything you’ve added shows up in their account.', {
-            phone: formatPhone(person.phone),
-          })}
+          {person.phone
+            ? t('They can see your hisaab from the link without signing up. When they join with {phone}, everything you’ve added shows up in their account.', {
+                phone: formatPhone(person.phone),
+              })
+            : t('You don’t have their number, so pick their chat in WhatsApp. They can see your hisaab from the link, and when they join from it, everything you’ve added shows up in their account.')}
         </p>
         {token ? <p className="rounded-2xl bg-slate-100 p-3 text-sm whitespace-pre-line [overflow-wrap:anywhere] dark:bg-slate-800">{message}</p> : null}
         <a

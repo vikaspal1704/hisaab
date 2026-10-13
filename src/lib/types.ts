@@ -10,11 +10,14 @@ export type EntryKind = 'expense' | 'payment' | 'forgive' | 'treat'
 export interface Person {
   id: string
   display_name: string
-  phone: string
+  /** null for a friend added by name only (see add_contact_by_name) */
+  phone: string | null
   upi_id: string | null
   is_registered: boolean
   is_contact: boolean
   is_me: boolean
+  /** a number-less friend I added, so I may give them a number */
+  can_set_phone?: boolean
 }
 
 export interface Balance {

@@ -14,12 +14,15 @@ export function InlineAddFriend({ onAdded, initialName = '' }: { onAdded: (id: s
   const [name, setName] = useState(initialName)
   const [phone, setPhone] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const mutation = useLedgerMutation((args: { phone: string; name: string }) => api.addContact(args.phone, args.name))
+  const mutation = useLedgerMutation((args: { phone: string | null; name: string }) =>
+    args.phone ? api.addContact(args.phone, args.name) : api.addContactByName(args.name),
+  )
 
   const add = () => {
-    const e164 = normalizePhone(phone)
+    // No number is fine: they can be given one later.
+    const e164 = phone.trim() ? normalizePhone(phone) : null
     if (!name.trim()) return setError(t('Enter a name'))
-    if (!e164) return setError(t('Enter a valid mobile number'))
+    if (phone.trim() && !e164) return setError(t('Enter a valid mobile number'))
     setError(null)
     mutation.mutate(
       { phone: e164, name: name.trim() },
@@ -38,7 +41,8 @@ export function InlineAddFriend({ onAdded, initialName = '' }: { onAdded: (id: s
     <div className="space-y-3 rounded-2xl bg-slate-50 p-3 dark:bg-slate-800/50">
       <p className="text-sm font-medium">{t('New friend')}</p>
       <TextInput placeholder={t('Name')} value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
-      <TextInput type="tel" inputMode="tel" placeholder={t('Mobile number')} value={phone} onChange={(e) => setPhone(e.target.value)} />
+      <TextInput type="tel" inputMode="tel" placeholder={t('Mobile number (optional)')} value={phone} onChange={(e) => setPhone(e.target.value)} />
+      <p className="text-xs text-slate-500 dark:text-slate-400">{t('Don’t have it? Add just the name — you can add the number later.')}</p>
       {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
       <Button block variant="secondary" busy={mutation.isPending} onClick={add}>{t('Add friend')}</Button>
     </div>
@@ -62,7 +66,7 @@ export function ContactChecklist({
     const q = query.trim().toLowerCase()
     return people.list
       .filter((p) => p.is_contact && !p.is_me)
-      .filter((p) => !q || p.display_name.toLowerCase().includes(q) || p.phone.includes(q))
+      .filter((p) => !q || p.display_name.toLowerCase().includes(q) || (p.phone ?? '').includes(q))
       .sort((a, b) => a.display_name.localeCompare(b.display_name))
   }, [people.list, query])
 

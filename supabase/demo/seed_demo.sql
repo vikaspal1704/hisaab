@@ -61,6 +61,7 @@ declare
   dk_uid uuid;   deepak uuid;
   i_uid uuid;    ishita uuid;
   kabir uuid;
+  bunty uuid;
   goa uuid; office uuid; flat uuid; carpool uuid;
   e uuid;
   v_payer uuid;
@@ -173,6 +174,16 @@ begin
   perform pg_temp.act(n_uid);
   perform public.save_expense(null, '🎤 Concert tickets', 900000, d - 2, null, 'equal', pg_temp.eq(neha, 900000, array[me, neha, arjun]));
 
+  -- Bunty: Rahul's cousin, added by name only (no number yet) -----------------------
+  perform pg_temp.act(me_uid);
+  bunty := public.add_contact_by_name('Bunty (Rahul’s cousin)');
+  perform public.save_expense(null, '🏏 Box cricket', 150000, d - 12, null, 'equal', pg_temp.eq(me, 150000, array[me, rahul, bunty]));
+
+  -- Logged for others: you note that Rahul paid for Priya's ticket (you're not in it).
+  perform public.save_expense(null, '🎟️ Priya’s movie ticket', 35000, d - 4, null, 'exact',
+    jsonb_build_array(jsonb_build_object('person_id', rahul, 'paid', 35000, 'owed', 0),
+                      jsonb_build_object('person_id', priya, 'paid', 0, 'owed', 35000)));
+
   -- Sneha: treats, a "chhod do", and a small difference that counts as even ----------
   perform pg_temp.act(s_uid);
   perform public.save_treat(sneha, 420000, '🎂 Birthday dinner', 'Birthday', d - 30, array[me, rahul], null);
@@ -274,13 +285,13 @@ begin
      set created_at = x.occurred_on + time '19:30' + (random() * interval '90 minutes')
    where x.occurred_on < d - 2
      and exists (select 1 from public.entry_parts ep where ep.entry_id = x.id
-                 and ep.person_id in (rahul, priya, amit, neha, arjun, sneha, deepak, ishita, kabir));
+                 and ep.person_id in (rahul, priya, amit, neha, arjun, sneha, deepak, ishita, kabir, bunty));
   update public.entry_events ev
      set created_at = x.created_at + (ev.id - (select min(id) from public.entry_events f where f.entry_id = x.id)) * interval '7 minutes'
     from public.entries x
    where ev.entry_id = x.id and x.occurred_on < d - 2
      and exists (select 1 from public.entry_parts ep where ep.entry_id = x.id
-                 and ep.person_id in (rahul, priya, amit, neha, arjun, sneha, deepak, ishita, kabir));
+                 and ep.person_id in (rahul, priya, amit, neha, arjun, sneha, deepak, ishita, kabir, bunty));
   update public.entry_reactions rx set updated_at = x.created_at + interval '1 day'
     from public.entries x where rx.entry_id = x.id and x.occurred_on < d - 2;
 end;

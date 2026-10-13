@@ -49,6 +49,16 @@ export const api = {
     return rpc<string>('add_contact', { p_phone: phone, p_name: name })
   },
 
+  /** A friend without a number (yet). */
+  addContactByName(name: string) {
+    return rpc<string>('add_contact_by_name', { p_name: name })
+  },
+
+  /** Gives a number-less friend their number; returns their id after (it changes if the number was already in Hisaab). */
+  setContactPhone(personId: string, phone: string) {
+    return rpc<string>('set_contact_phone', { p_person: personId, p_phone: phone })
+  },
+
   /** Adds many friends at once; returns how many were new. */
   async addContacts(rows: { phone: string; name: string }[]): Promise<number> {
     let added = 0

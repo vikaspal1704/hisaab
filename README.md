@@ -31,6 +31,14 @@ tiers: **GitHub Pages** for the app and **Supabase** for the database and login.
   that number, the whole history moves into their account. (With Google sign-in the number
   isn't verified, so a number that already has history can only be taken from such a link,
   or with SMS OTP. Nobody can sign up with your friend's number and read their books.)
+- **Friends without a number.** Add someone by name only (the cook, a friend's cousin on the
+  trip) and keep adding expenses with them. Add their number later from their page: if that
+  number is already in Hisaab, the two become one person and all history follows. You can
+  also invite them on WhatsApp by picking their chat; joining from that link gives them
+  everything you added. Only the person who added a number-less friend can set their number.
+- **Add an expense for others.** Remove yourself from the split and pick who paid ("Rahul
+  paid for Priya's ticket"). It doesn't touch your balance; they see it in "To check", and you
+  can still edit it and hear if they question it.
 - **Split by item.** Type the bill line by line (pizza for everyone, beer just for Rahul), add
   tax/GST (5, 10 or 18% in one tap), tip and discount, and each person's share works out to the
   paisa: items equally among who had them, charges in proportion. Enter the receipt total to
@@ -129,7 +137,7 @@ another app, and asking for money back is awkward.
   That one rule covers simple payments, a partner paying for both, and paying on someone's
   behalf.
 - The browser can only **read** data, filtered by Postgres Row Level Security: you see only
-  entries you are part of. All writes go through database functions that check every rule.
+  entries you are part of (or added yourself). All writes go through database functions that check every rule.
   Phone numbers of people who aren't your contacts are masked.
 
 The schema, rules and access control live in [`supabase/migrations/`](supabase/migrations/):
@@ -154,7 +162,8 @@ You need a GitHub account, a Supabase account (free) and a Google Cloud account 
    `supabase/migrations/20261016000000_items_search_invites.sql`, then
    `supabase/migrations/20261017000000_carpool.sql`, then
    `supabase/migrations/20261018000000_delete_group.sql`, then
-   `supabase/migrations/20261019000000_contact_matching.sql`, in that order. If a file says
+   `supabase/migrations/20261019000000_contact_matching.sql`, then
+   `supabase/migrations/20261020000000_no_phone_and_on_behalf.sql`, in that order. If a file says
    something "already exists", it was run before: skip it and run the next one.
 3. Open **Project Settings → API** and note the **Project URL** and the **anon / publishable
    key**. Both are meant to be public; Row Level Security protects the data.

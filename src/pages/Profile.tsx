@@ -32,7 +32,7 @@ export function ProfilePage() {
         <Avatar id={me.id} name={me.display_name} size={64} />
         <div>
           <p className="text-xl font-semibold">{me.display_name}</p>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{formatPhone(me.phone)}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">{me.phone ? formatPhone(me.phone) : null}</p>
         </div>
       </div>
       <Button variant="secondary" block className="mt-4" onClick={() => setShowQr(true)}>
@@ -40,7 +40,7 @@ export function ProfilePage() {
       </Button>
       {showQr ? <PayMeSheet open onClose={() => setShowQr(false)} /> : null}
 
-      <ProfileForm key={`${me.display_name}|${me.upi_id}`} name={me.display_name} phone={me.phone} upi={me.upi_id ?? ''} />
+      <ProfileForm key={`${me.display_name}|${me.upi_id}`} name={me.display_name} phone={me.phone ?? ''} upi={me.upi_id ?? ''} />
       </div>
       <div className="lg:-mt-7">
 

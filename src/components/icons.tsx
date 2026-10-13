@@ -104,3 +104,6 @@ export const IconGoogle = ({ size = 22 }: IconProps) => (
     <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3a12 12 0 0 1-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.2-.1-2.3-.4-3.5z" />
   </svg>
 )
+export const IconPhone = (p: IconProps) => (
+  <svg {...base(p)}><rect x="6" y="2" width="12" height="20" rx="2.5" /><path d="M11 18h2" /></svg>
+)

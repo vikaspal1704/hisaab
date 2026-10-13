@@ -48,10 +48,13 @@ describe('demo data', () => {
 
     await db.as(me, 'select public.run_due_recurring()')
     const b = await balances()
-    expect(Object.keys(b).sort()).toEqual(['Amit', 'Deepak', 'Ishita', 'Kabir', 'Neha', 'Priya', 'Rahul', 'Real', 'Sneha'])
+    expect(Object.keys(b).sort()).toEqual(['Amit', 'Bunty (Rahul’s cousin)', 'Deepak', 'Ishita', 'Kabir', 'Neha', 'Priya', 'Rahul', 'Real', 'Sneha'])
     expect(b.Kabir).toBe(150000) // owes you, for a month → reminder
     expect(b.Amit).toBe(-26300) // exact: you owe ₹263
     expect(b.Real).toBe(5000) // own data untouched
+    expect(b['Bunty (Rahul’s cousin)']).toBe(50000) // a friend with no number
+    const forOthers = await db.as<{ n: number }>(me, `select count(*)::int as n from public.search_entries('movie ticket')`)
+    expect(forOthers[0].n).toBe(1) // logged for Rahul & Priya, not involving you
     const rides = await db.as<{ n: number }>(me, `select count(*)::int as n from public.carpool_trips`)
     expect(rides[0].n).toBeGreaterThanOrEqual(8)
 
@@ -85,6 +88,7 @@ describe('demo data', () => {
     const left = await db.admin<{ n: number }>(
       `select (select count(*) from public.people where phone like '+120255501%')
             + (select count(*) from auth.users where email like '%@demo.hisaab.invalid')
+            + (select count(*) from public.people where phone is null)
             + (select count(*) from public.groups) + (select count(*) from public.households) + (select count(*) from public.shortcuts) as n`,
     )
     expect(Number(left[0].n)).toBe(0)

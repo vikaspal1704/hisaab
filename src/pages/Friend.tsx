@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
-import { ForgiveSheet, FriendSettingsSheet, InviteSheet, LentSheet, NudgeSheet, ShareSheet } from '../components/FriendSheets'
-import { IconDownload, IconGift, IconHandshake, IconHeartHand, IconQr, IconSettings, IconShare, IconSwap, IconWhatsApp } from '../components/icons'
+import { AddNumberSheet, ForgiveSheet, FriendSettingsSheet, InviteSheet, LentSheet, NudgeSheet, ShareSheet } from '../components/FriendSheets'
+import { IconDownload, IconGift, IconHandshake, IconHeartHand, IconPhone, IconQr, IconSettings, IconShare, IconSwap, IconWhatsApp } from '../components/icons'
 import { KindIcon } from '../components/KindIcon'
 import { useIsDesktop } from '../hooks/useMediaQuery'
 import { toneClass } from '../components/Money'
@@ -26,10 +26,11 @@ import { formatINR } from '../lib/money'
 import { formatPhone } from '../lib/phone'
 import type { LedgerRow, Reaction } from '../lib/types'
 
-type SheetName = 'settings' | 'lent' | 'forgive' | 'share' | 'nudge' | 'qr' | 'invite' | null
+type SheetName = 'settings' | 'lent' | 'forgive' | 'share' | 'nudge' | 'qr' | 'invite' | 'number' | null
 
 export function FriendPage() {
   const { id = '' } = useParams()
+  const navigate = useNavigate()
   const { t } = useT()
   const desktop = useIsDesktop()
   const people = usePeople()
@@ -116,7 +117,7 @@ export function FriendPage() {
       <div className="flex flex-col items-center pt-2 text-center lg:rounded-3xl lg:bg-white lg:p-6 lg:shadow-card lg:ring-1 lg:ring-slate-200/70 dark:lg:bg-slate-900 dark:lg:ring-slate-800">
         <Avatar id={person.id} name={name} size={72} />
         <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-          {formatPhone(person.phone)} · {baari ? t('Baari') : t('Exact splits')}
+          {person.phone ? formatPhone(person.phone) : t('No number yet')} · {baari ? t('Baari') : t('Exact splits')}
         </p>
         <p className={`mt-3 text-2xl font-bold ${state.kind === 'even' ? 'text-slate-600 dark:text-slate-300' : toneClass(net)}`}>{headline}</p>
         {detail ? <p className="mt-1 max-w-xs text-sm text-slate-500 dark:text-slate-400">{detail}</p> : null}
@@ -137,6 +138,9 @@ export function FriendPage() {
           ) : null}
           <button type="button" onClick={() => setSheet('share')} className={soft}><IconShare size={17} /> {t('Share hisaab')}</button>
           <Link to={`/statement/p/${id}`} className={soft}><IconDownload size={17} /> {t('Export')}</Link>
+          {person.phone === null && person.can_set_phone ? (
+            <button type="button" onClick={() => setSheet('number')} className={soft}><IconPhone size={17} /> {t('Add number')}</button>
+          ) : null}
           {!person.is_registered ? (
             <button type="button" onClick={() => setSheet('invite')} className={`${pill} bg-[#25D366]/15 text-[#0b7a63] hover:bg-[#25D366]/25 dark:text-[#25D366]`}>
               <IconWhatsApp size={18} /> {t('Invite')}
@@ -145,10 +149,14 @@ export function FriendPage() {
         </div>
         {!person.is_registered ? (
           <p className="mt-4 rounded-2xl bg-sky-50 p-3 text-left text-sm text-sky-900 ring-1 ring-sky-200 dark:bg-sky-950/40 dark:text-sky-100 dark:ring-sky-900">
-            {t('{name} isn’t on Hisaab yet — that’s fine. Keep adding expenses: they’re saved against {phone}, and {name} sees all of it the day they join with that number.', {
-              name: name.split(' ')[0],
-              phone: formatPhone(person.phone),
-            })}
+            {person.phone
+              ? t('{name} isn’t on Hisaab yet — that’s fine. Keep adding expenses: they’re saved against {phone}, and {name} sees all of it the day they join with that number.', {
+                  name: name.split(' ')[0],
+                  phone: formatPhone(person.phone),
+                })
+              : t('You added {name} without a number — that’s fine, keep adding expenses. Add their number when you have it, or send them the invite on WhatsApp: when they join from it, they see all of it.', {
+                  name: name.split(' ')[0],
+                })}
           </p>
         ) : null}
         {household ? (
@@ -200,6 +208,17 @@ export function FriendPage() {
       {sheet === 'lent' ? <LentSheet open onClose={() => setSheet(null)} personId={id} /> : null}
       {sheet === 'forgive' ? <ForgiveSheet open onClose={() => setSheet(null)} personId={id} owed={net} /> : null}
       {sheet === 'share' ? <ShareSheet open onClose={() => setSheet(null)} personId={id} /> : null}
+      {sheet === 'number' ? (
+        <AddNumberSheet
+          open
+          onClose={() => setSheet(null)}
+          personId={id}
+          onDone={(newId) => {
+            setSheet(null)
+            if (newId !== id) navigate(`/p/${newId}`, { replace: true })
+          }}
+        />
+      ) : null}
       {sheet === 'invite' ? <InviteSheet open onClose={() => setSheet(null)} personId={id} /> : null}
       {sheet === 'qr' ? <PayMeSheet open onClose={() => setSheet(null)} amount={net} payerName={name} recordTo={`/settle/person/${id}`} /> : null}
       {sheet === 'nudge' ? <NudgeSheet open onClose={() => setSheet(null)} personId={id} amount={net} /> : null}

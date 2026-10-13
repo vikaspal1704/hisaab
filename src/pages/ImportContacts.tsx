@@ -76,7 +76,7 @@ function ImportFlow() {
   const [onHisaab, setOnHisaab] = useState<Set<string>>(new Set())
   const save = useLedgerMutation((rows: ImportCandidate[]) => api.addContacts(rows.map(({ phone, name }) => ({ phone, name }))))
 
-  const existingPhones = useMemo(() => new Set(people.list.filter((p) => p.is_contact).map((p) => p.phone)), [people.list])
+  const existingPhones = useMemo(() => new Set(people.list.flatMap((p) => (p.is_contact && p.phone ? [p.phone] : []))), [people.list])
 
   const load = (raw: RawContact[], source: Source) => {
     const rows = toCandidates(raw, { myPhone: people.me?.phone ?? '', existingPhones }).filter((c) => c.status !== 'me')
