@@ -7,9 +7,11 @@ import { AuthProvider } from './auth/AuthProvider'
 import { ToastProvider } from './components/Toast'
 import { I18nProvider } from './lib/i18n'
 import './index.css'
+import { initNativeApp, isNativeApp } from './lib/native'
 import { captureSharedText } from './lib/shareTarget'
 
 captureSharedText()
+initNativeApp()
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,7 +35,7 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )
 
-if ('serviceWorker' in navigator && import.meta.env.PROD) {
+if ('serviceWorker' in navigator && import.meta.env.PROD && !isNativeApp()) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`).catch(() => {})
   })

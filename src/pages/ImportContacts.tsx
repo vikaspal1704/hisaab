@@ -1,6 +1,6 @@
-import { useMemo, useState, type ChangeEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { IconCheck, IconClipboard, IconContacts, IconKeyboard, IconUpload } from '../components/icons'
+import { IconCheck, IconClipboard, IconContacts, IconGoogle, IconKeyboard, IconUpload } from '../components/icons'
 import { Page } from '../components/Page'
 import { CheckRow, SearchBox } from '../components/PeoplePicker'
 import { useToast } from '../components/Toast'
@@ -10,10 +10,16 @@ import { api } from '../lib/api'
 import { parseContactsFile, parsePastedContacts, toCandidates, type ImportCandidate, type RawContact } from '../lib/contactsImport'
 import { friendlyError } from '../lib/errors'
 import { useT } from '../lib/i18n'
+import { findRegistered } from '../lib/contactMatch'
+import { deviceContactsAvailable, readDeviceContacts } from '../lib/deviceContacts'
+import { formatRelative } from '../lib/format'
+import { googleContactsAvailable, lastGoogleSync, prepareGoogleContacts, readGoogleContacts } from '../lib/googleContacts'
 import { formatPhone } from '../lib/phone'
 import { contactPicker, detectPlatform, type Platform } from '../lib/platform'
 
-type Source = 'picker' | 'file' | 'paste'
+/** Where contacts came from. A whole address book (file, Google, phone sync) starts with nobody ticked. */
+export type Source = 'picker' | 'file' | 'paste' | 'google' | 'device'
+const WHOLE_BOOK: Source[] = ['file', 'google', 'device']
 type Method = 'file' | 'paste'
 
 /** Contacts read on the Friends page and handed over for review. */
@@ -67,6 +73,7 @@ function ImportFlow() {
   const [query, setQuery] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loadedHandoff, setLoadedHandoff] = useState(false)
+  const [onHisaab, setOnHisaab] = useState<Set<string>>(new Set())
   const save = useLedgerMutation((rows: ImportCandidate[]) => api.addContacts(rows.map(({ phone, name }) => ({ phone, name }))))
 
   const existingPhones = useMemo(() => new Set(people.list.filter((p) => p.is_contact).map((p) => p.phone)), [people.list])
@@ -80,7 +87,13 @@ function ImportFlow() {
     setError(null)
     setCandidates(rows)
     // Picked or pasted: you already chose these people. A whole address book: start empty.
-    setSelected(source === 'file' ? new Set() : new Set(rows.filter((r) => r.status === 'new').map((r) => r.phone)))
+    const fresh = rows.filter((r) => r.status === 'new').map((r) => r.phone)
+    setSelected(WHOLE_BOOK.includes(source) ? new Set() : new Set(fresh))
+    // Who's already on Hisaab: shown first and ticked for you.
+    void findRegistered(fresh).then((found) => {
+      setOnHisaab(found)
+      if (found.size > 0 && WHOLE_BOOK.includes(source)) setSelected((s) => new Set([...s, ...found]))
+    })
   }
 
   // Contacts read on the Friends page arrive here for review.
@@ -93,6 +106,24 @@ function ImportFlow() {
     const raw = await pickFromPhone()
     if (raw) load(raw, 'picker')
   }
+
+  useEffect(() => {
+    void prepareGoogleContacts().catch(() => {})
+  }, [])
+  const [busy, setBusy] = useState(false)
+  const fromSource = async (read: () => Promise<RawContact[] | null>, source: Source) => {
+    setError(null)
+    setBusy(true)
+    try {
+      const raw = await read()
+      if (raw) load(raw, source)
+    } catch {
+      setError(t('Couldn’t read your contacts. Try again, or use a contacts file.'))
+    } finally {
+      setBusy(false)
+    }
+  }
+  const lastSync = lastGoogleSync()
 
   const fromFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -107,8 +138,10 @@ function ImportFlow() {
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return (candidates ?? []).filter((c) => !q || c.name.toLowerCase().includes(q) || c.phone.includes(q.replace(/\s/g, '')))
-  }, [candidates, query])
+    return (candidates ?? [])
+      .filter((c) => !q || c.name.toLowerCase().includes(q) || c.phone.includes(q.replace(/\s/g, '')))
+      .sort((a, b) => Number(onHisaab.has(b.phone)) - Number(onHisaab.has(a.phone)))
+  }, [candidates, query, onHisaab])
   const newVisible = visible.filter((c) => c.status === 'new')
   const allVisibleSelected = newVisible.length > 0 && newVisible.every((c) => selected.has(c.phone))
 
@@ -159,6 +192,11 @@ function ImportFlow() {
         <Card className="mt-4 flex items-center gap-3 p-3 text-sm">
           <span className="flex-1 text-slate-600 dark:text-slate-300">
             {t('{n} contacts with a mobile number · {m} new', { n: candidates.length, m: newCount })}
+            {onHisaab.size > 0 ? (
+              <span className="mt-0.5 block font-medium text-brand-700 dark:text-brand-400">
+                {t('{n} already on Hisaab — ticked for you', { n: onHisaab.size })}
+              </span>
+            ) : null}
           </span>
           {newVisible.length > 0 ? (
             <Button variant={allVisibleSelected ? 'secondary' : 'primary'} className="min-h-10 shrink-0 text-sm" onClick={toggleAll}>
@@ -179,7 +217,14 @@ function ImportFlow() {
                 </span>
               </div>
             ) : (
-              <CheckRow key={c.phone} checked={selected.has(c.phone)} onClick={() => toggle(c.phone)} id={c.phone} name={c.name} subtitle={formatPhone(c.phone)} />
+              <CheckRow
+                key={c.phone}
+                checked={selected.has(c.phone)}
+                onClick={() => toggle(c.phone)}
+                id={c.phone}
+                name={c.name}
+                subtitle={onHisaab.has(c.phone) ? `✓ ${t('On Hisaab')} · ${formatPhone(c.phone)}` : formatPhone(c.phone)}
+              />
             ),
           )}
         </Card>
@@ -195,7 +240,15 @@ function ImportFlow() {
       <Steps step={1} />
       <p className="mt-4 text-slate-600 dark:text-slate-300">{t('Pick the easiest way for you. Nothing is added until you choose who.')}</p>
       <div className="mt-4 space-y-3">
-        {contactPicker ? (
+        {deviceContactsAvailable ? (
+          <Option
+            icon={<IconContacts />}
+            title={t('Sync your phone contacts')}
+            body={t('Reads your address book on this phone. Sync again any time — only new people are offered.')}
+            badge={t('Easiest')}
+            onClick={() => fromSource(readDeviceContacts, 'device')}
+          />
+        ) : contactPicker ? (
           <Option
             icon={<IconContacts />}
             title={t('Pick from your phone')}
@@ -204,6 +257,19 @@ function ImportFlow() {
             onClick={fromPicker}
           />
         ) : null}
+        {googleContactsAvailable ? (
+          <Option
+            icon={<IconGoogle />}
+            title={t('Connect Google Contacts')}
+            body={
+              lastSync
+                ? t('Last synced {when}. Sync again to see new people.', { when: formatRelative(lastSync.toISOString()) })
+                : t('Your Google address book — where most Android phones save contacts. Works on laptops too.')
+            }
+            onClick={() => fromSource(readGoogleContacts, 'google')}
+          />
+        ) : null}
+        {busy ? <p className="text-center text-sm text-slate-500">{t('Reading your contacts…')}</p> : null}
         <Option
           icon={<IconUpload />}
           title={t('Upload a contacts file')}

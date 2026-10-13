@@ -8,6 +8,7 @@ import { usePeople } from '../hooks/queries'
 import { useT } from '../lib/i18n'
 import { formatINR, type Paise } from '../lib/money'
 import { copyText } from '../lib/share'
+import { isNativeApp, shareFile } from '../lib/native'
 import { upiPayLink } from '../lib/upi'
 
 /**
@@ -69,6 +70,11 @@ export function PayMeSheet({
             <a
               href={png}
               download={`hisaab-upi-${upi.split('@')[0]}.png`}
+              onClick={(e) => {
+                if (!isNativeApp()) return
+                e.preventDefault()
+                void shareFile(`hisaab-upi-${upi.split('@')[0]}.png`, png.split(',')[1], 'base64', t('My UPI QR'))
+              }}
               className="flex min-h-11 items-center justify-center rounded-xl text-sm font-semibold ring-1 ring-slate-300 dark:ring-slate-700"
             >
               {t('Save image')}

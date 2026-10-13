@@ -1,8 +1,13 @@
 import { formatINR, type Paise } from './money'
 
-/** The address of this app (without the hash route), for invite messages. */
+/**
+ * The public address of the web app (without the hash route), for links sent
+ * to friends. The Android app runs from a local address, so it uses the
+ * deployed site (VITE_PUBLIC_URL) instead.
+ */
 export function appUrl(): string {
-  return window.location.origin + window.location.pathname
+  const configured = import.meta.env.VITE_PUBLIC_URL as string | undefined
+  return configured || window.location.origin + window.location.pathname
 }
 
 /** Opens WhatsApp with a prefilled message to a number. */

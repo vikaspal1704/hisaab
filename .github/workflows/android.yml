@@ -1,0 +1,80 @@
+# Builds the Android app (an APK) from the same web code and publishes it as the
+# "android-latest" GitHub release, so there's always one download link:
+#   https://github.com/<owner>/<repo>/releases/download/android-latest/hisaab.apk
+# Without the optional HISAAB_KEYSTORE_* secrets it's signed with the committed
+# debug key (fine for sharing with friends; see README for Play Store signing).
+name: Android app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - name: Build the web app for Android
+        run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
+          VITE_ENABLE_PHONE_OTP: ${{ vars.VITE_ENABLE_PHONE_OTP }}
+          # Links sent to friends point at the website, not the app.
+          VITE_PUBLIC_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+      - run: npx cap sync android
+      - name: Use the release key, if configured
+        env:
+          KEYSTORE_BASE64: ${{ secrets.HISAAB_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+            echo "HISAAB_KEYSTORE_FILE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+          fi
+      - name: Build the APK
+        working-directory: android
+        env:
+          HISAAB_KEYSTORE_PASSWORD: ${{ secrets.HISAAB_KEYSTORE_PASSWORD }}
+          HISAAB_KEY_ALIAS: ${{ secrets.HISAAB_KEY_ALIAS }}
+          HISAAB_KEY_PASSWORD: ${{ secrets.HISAAB_KEY_PASSWORD }}
+        run: |
+          chmod +x gradlew
+          if [ -n "$HISAAB_KEYSTORE_FILE" ]; then
+            ./gradlew --no-daemon assembleRelease
+            cp app/build/outputs/apk/release/app-release.apk ../hisaab.apk
+          else
+            ./gradlew --no-daemon assembleDebug
+            cp app/build/outputs/apk/debug/app-debug.apk ../hisaab.apk
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hisaab-apk
+          path: hisaab.apk
+      - name: Publish as the "android-latest" release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete android-latest --yes --cleanup-tag || true
+          gh release create android-latest hisaab.apk \
+            --target "$GITHUB_SHA" \
+            --title "Hisaab for Android (latest)" \
+            --notes "Built from ${GITHUB_SHA::7}. Download hisaab.apk on your Android phone and open it to install (allow installing from your browser if asked)." \
+            --latest=false

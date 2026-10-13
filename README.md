@@ -50,6 +50,15 @@ tiers: **GitHub Pages** for the app and **Supabase** for the database and login.
   pasted list of names and numbers (e.g. copied from a WhatsApp group), or typing a number.
   You tick who to add in a second step. Importing again later only offers new people, so it
   works as a manual sync. Contacts are read on the phone; only the people you tick are saved.
+- **Connect Google Contacts.** One tap reads the address book saved in your Google account
+  (where most Android phones keep contacts), on phones and laptops alike. The read-only access
+  is dropped as soon as the list is read; tap again later to sync new people (optional setup
+  below).
+- **Who's already on Hisaab.** When you import, friends who've already signed up are marked
+  "On Hisaab", shown first and ticked for you. Only scrambled (SHA-256) numbers are sent to
+  check, with a daily limit.
+- **Android app.** The same app as an installable APK that syncs your whole phone address book
+  (see "Android app" below).
 - **Delete or leave a group.** The creator can delete a group: it disappears for everyone, but
   its expenses and payments stay in everyone's balances and passbooks, so nobody's hisaab
   changes. Anyone else can leave once they're settled up in it.
@@ -144,7 +153,8 @@ You need a GitHub account, a Supabase account (free) and a Google Cloud account 
    `supabase/migrations/20261015000000_office_and_kitty.sql`, then
    `supabase/migrations/20261016000000_items_search_invites.sql`, then
    `supabase/migrations/20261017000000_carpool.sql`, then
-   `supabase/migrations/20261018000000_delete_group.sql`, in that order. If a file says
+   `supabase/migrations/20261018000000_delete_group.sql`, then
+   `supabase/migrations/20261019000000_contact_matching.sql`, in that order. If a file says
    something "already exists", it was run before: skip it and run the next one.
 3. Open **Project Settings → API** and note the **Project URL** and the **anon / publishable
    key**. Both are meant to be public; Row Level Security protects the data.
@@ -209,6 +219,47 @@ Everything else works without this; it adds phone notifications.
    repository **secret** `HISAAB_SECRET` (for the weekly summary workflow), then redeploy.
    Each person turns notifications on under **Me → Notifications**. On iPhone this needs
    iOS 16.4+ and Hisaab added to the home screen.
+
+### Optional: "Connect Google Contacts"
+
+Uses the same Google Cloud project as "Sign in with Google".
+
+1. Google Cloud Console → **APIs & Services → Library** → enable **People API**.
+2. **OAuth consent screen → Data access** (or *Scopes*) → add
+   `.../auth/contacts.readonly`. While the app is in *Testing*, add yourself and your friends
+   (up to 100 Google accounts) under **Audience → Test users**. To open it to everyone, submit
+   the app for Google's verification (free; needs a privacy policy page).
+3. **Credentials** → open your *Web application* OAuth client → under **Authorised JavaScript
+   origins** add `https://<your-github-username>.github.io`.
+4. Copy its **Client ID** and add it on GitHub as a repository variable named
+   `VITE_GOOGLE_CLIENT_ID` (Settings → Secrets and variables → Actions → Variables), then re-run
+   the *Deploy to GitHub Pages* workflow. The "Google Contacts" button appears once it's set.
+
+### Android app
+
+Every push to `main` also builds an Android app (Capacitor wraps the same web code) and
+publishes it at a fixed link:
+`https://github.com/<you>/<repo>/releases/download/android-latest/hisaab.apk`
+(the *Android app* workflow; also under Releases → "Hisaab for Android (latest)").
+
+- **Install:** open that link on an Android phone, download, open the file, and allow your
+  browser to install apps if asked. New builds install over the old one.
+- **Sign-in from the app:** in Supabase → Authentication → URL Configuration → **Redirect URLs**,
+  add `app.hisaab://auth-callback`. Google sign-in opens in the phone's browser and comes back
+  to the app.
+- **Contacts:** "Sync phone" asks for permission once, reads the whole address book on the
+  phone, and offers only new people each time.
+- **Signing:** builds are signed with a committed debug key so updates install over each
+  other. For the Play Store, create your own key (`keytool -genkeypair -v -keystore
+  hisaab.keystore -alias hisaab -keyalg RSA -keysize 2048 -validity 10000`) and add these
+  repository secrets: `HISAAB_KEYSTORE_BASE64` (the file, base64-encoded), `HISAAB_KEYSTORE_PASSWORD`,
+  `HISAAB_KEY_ALIAS`, `HISAAB_KEY_PASSWORD`. The workflow then builds a release APK with it.
+  (Switching keys means uninstalling the debug build once.) The Play Store costs $25 once;
+  Google asks you to explain the contacts permission ("find friends to split expenses with").
+- **Not in the app yet:** push notifications (the website's push doesn't work inside apps),
+  sharing UPI messages into the app, and iPhone.
+- **Build locally:** `npm run build && npx cap sync android`, then open `android/` in Android
+  Studio.
 
 ### Optional: SMS OTP login
 

@@ -1,8 +1,8 @@
-import { useMemo, useState, type ChangeEvent } from 'react'
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Avatar } from '../components/Avatar'
 import { InviteSheet } from '../components/FriendSheets'
-import { IconClipboard, IconContacts, IconUpload, IconUserPlus, IconWhatsApp } from '../components/icons'
+import { IconClipboard, IconContacts, IconGoogle, IconUpload, IconUserPlus, IconWhatsApp } from '../components/icons'
 import { StyledBalance } from '../components/Money'
 import { HeaderButton, Page } from '../components/Page'
 import { SearchBox } from '../components/PeoplePicker'
@@ -11,6 +11,9 @@ import { useBalances, useContactPrefs, usePeople } from '../hooks/queries'
 import { friendlyError } from '../lib/errors'
 import { useT } from '../lib/i18n'
 import { formatPhone } from '../lib/phone'
+import type { RawContact } from '../lib/contactsImport'
+import { deviceContactsAvailable, readDeviceContacts } from '../lib/deviceContacts'
+import { googleContactsAvailable, prepareGoogleContacts, readGoogleContacts } from '../lib/googleContacts'
 import { contactPicker } from '../lib/platform'
 import { pickFromPhone, readContactsFile, type ImportHandoff } from './ImportContacts'
 
@@ -136,6 +139,18 @@ function ImportCard({ prominent }: { prominent: boolean }) {
     const raw = await pickFromPhone()
     if (raw) review({ raw, source: 'picker' })
   }
+  useEffect(() => {
+    void prepareGoogleContacts().catch(() => {})
+  }, [])
+  const fromSource = async (read: () => Promise<RawContact[] | null>, source: ImportHandoff['source']) => {
+    setError(null)
+    try {
+      const raw = await read()
+      if (raw) review({ raw, source })
+    } catch {
+      setError(t('Couldn’t read your contacts. Try again, or use a contacts file.'))
+    }
+  }
   const fromFile = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     event.target.value = ''
@@ -156,8 +171,12 @@ function ImportCard({ prominent }: { prominent: boolean }) {
     >
       <p className="text-lg font-semibold">{prominent ? t('Bring your friends in') : t('Import more contacts')}</p>
       <p className="mt-1 text-sm text-brand-100">{t('Pick who to add — nothing is saved until you choose.')}</p>
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        {contactPicker ? (
+      <div className={`mt-4 grid gap-2 ${googleContactsAvailable ? 'grid-cols-2' : 'grid-cols-3'}`}>
+        {deviceContactsAvailable ? (
+          <button type="button" onClick={() => fromSource(readDeviceContacts, 'device')} className={tile}>
+            <IconContacts size={22} /> {t('Sync phone')}
+          </button>
+        ) : contactPicker ? (
           <button type="button" onClick={fromPicker} className={tile}>
             <IconContacts size={22} /> {t('From phone')}
           </button>
@@ -166,6 +185,11 @@ function ImportCard({ prominent }: { prominent: boolean }) {
             <IconContacts size={22} /> {t('From phone')}
           </Link>
         )}
+        {googleContactsAvailable ? (
+          <button type="button" onClick={() => fromSource(readGoogleContacts, 'google')} className={tile}>
+            <span className="rounded-full bg-white p-1"><IconGoogle size={16} /></span> {t('Google Contacts')}
+          </button>
+        ) : null}
         <label className={`${tile} cursor-pointer`}>
           <IconUpload size={22} /> {t('From a file')}
           <input type="file" accept=".vcf,.vcard,.csv,text/vcard,text/x-vcard,text/csv" onChange={fromFile} className="sr-only" aria-label={t('Contacts file')} />

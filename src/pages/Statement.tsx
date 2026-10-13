@@ -10,6 +10,7 @@ import { friendlyError } from '../lib/errors'
 import { todayISO } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { formatINR } from '../lib/money'
+import { isNativeApp, shareFile } from '../lib/native'
 import { friendStatement, groupStatement, statementFileName, toCsv, type Cell, type Statement } from '../lib/statement'
 
 /** A printable, downloadable statement for one friend (/statement/p/:id) or group (/statement/g/:id). */
@@ -48,6 +49,10 @@ function StatementView({ statement }: { statement: Statement }) {
 
   const csvFile = () => new File([toCsv(statement)], fileName, { type: 'text/csv' })
   const download = () => {
+    if (isNativeApp()) {
+      void shareFile(fileName, toCsv(statement), 'utf8', statement.title).catch(() => toast(t('Couldn’t share — try Download instead')))
+      return
+    }
     const url = URL.createObjectURL(csvFile())
     const a = document.createElement('a')
     a.href = url
@@ -67,7 +72,7 @@ function StatementView({ statement }: { statement: Statement }) {
   return (
     <Page title={t('Statement')} back wide>
       <div className="mt-2 grid grid-cols-2 gap-2 print:hidden lg:mt-0 lg:flex lg:justify-end">
-        <Button onClick={() => window.print()}>📄 {t('Save as PDF')}</Button>
+        {isNativeApp() ? null : <Button onClick={() => window.print()}>📄 {t('Save as PDF')}</Button>}
         <Button variant="secondary" onClick={download}>⬇️ {t('Download CSV')}</Button>
         {canShareFile ? (
           <Button variant="ghost" className="col-span-2" onClick={share}>

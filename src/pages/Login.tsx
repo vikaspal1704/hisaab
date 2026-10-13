@@ -3,6 +3,7 @@ import { IconCheck } from '../components/icons'
 import { Button, Field, TextInput } from '../components/ui'
 import { friendlyError } from '../lib/errors'
 import { normalizePhone } from '../lib/phone'
+import { isNativeApp, nativeGoogleSignIn } from '../lib/native'
 import { phoneOtpEnabled, supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 
@@ -16,6 +17,15 @@ export function LoginPage() {
   const google = async () => {
     setBusy(true)
     setError(null)
+    if (isNativeApp()) {
+      try {
+        await nativeGoogleSignIn()
+      } catch (e) {
+        setError(friendlyError(e))
+      }
+      setBusy(false)
+      return
+    }
     const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: redirectTo() } })
     if (error) {
       setError(friendlyError(error))

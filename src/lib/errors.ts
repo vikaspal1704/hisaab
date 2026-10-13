@@ -9,6 +9,7 @@ const MESSAGES: Record<string, string> = {
   only_group_creator: 'Only the person who created this group can delete it.',
   creator_cannot_leave: 'You created this group — delete it instead of leaving.',
   settle_before_leaving: 'Settle up in this group first (and hand over the kitty if you hold it), then you can leave.',
+  too_many_lookups: 'You can only check up to 2,000 numbers at a time, and 10,000 a day.',
   not_a_carpool: 'Set this group up as a car pool first (edit the group).',
   invalid_trip: 'Pick a driver and at least one rider (the driver can’t also be a rider).',
   trip_already_logged: 'That ride is already logged. Undo it first to change it.',

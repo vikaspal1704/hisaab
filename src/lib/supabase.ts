@@ -1,3 +1,4 @@
+import { Capacitor } from '@capacitor/core'
 import { createClient } from '@supabase/supabase-js'
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
@@ -12,7 +13,8 @@ export const supabase = createClient(url ?? 'http://localhost:54321', key ?? 'mi
     flowType: 'pkce',
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
+    // In the Android app the code arrives through a deep link instead (see native.ts).
+    detectSessionInUrl: !Capacitor.isNativePlatform(),
   },
 })
 
