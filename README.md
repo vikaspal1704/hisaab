@@ -36,6 +36,16 @@ tiers: **GitHub Pages** for the app and **Supabase** for the database and login.
   number is already in Hisaab, the two become one person and all history follows. You can
   also invite them on WhatsApp by picking their chat; joining from that link gives them
   everything you added. Only the person who added a number-less friend can set their number.
+- **Fix a wrong number.** Typed a friend's number wrong? "Wrong number? Fix it" on their page
+  moves your hisaab with them to the right number (joining up with whoever already has it) and
+  turns off links sent to the wrong one. It works until they join, and not when other people
+  saved that number themselves (it may be right for them). You can also change your own number
+  under **Me → Change number**; your history stays with you.
+- **Free number verification on WhatsApp.** Instead of a paid SMS OTP, you send a short code
+  from your WhatsApp to Hisaab's WhatsApp number (one tap, the message is filled in). Hisaab
+  sees which number it came from, so the number is proven yours. Verified numbers get a ✓, can
+  take over history friends recorded for them, and can change to a number that already has
+  history (optional setup below).
 - **Add an expense for others.** Remove yourself from the split and pick who paid ("Rahul
   paid for Priya's ticket"). It doesn't touch your balance; they see it in "To check", and you
   can still edit it and hear if they question it.
@@ -166,7 +176,8 @@ You need a GitHub account, a Supabase account (free) and a Google Cloud account 
    `supabase/migrations/20261018000000_delete_group.sql`, then
    `supabase/migrations/20261019000000_contact_matching.sql`, then
    `supabase/migrations/20261020000000_no_phone_and_on_behalf.sql`, then
-   `supabase/migrations/20261021000000_carpool_distance.sql`, in that order. If a file says
+   `supabase/migrations/20261021000000_carpool_distance.sql`, then
+   `supabase/migrations/20261022000000_change_phone.sql`, in that order. If a file says
    something "already exists", it was run before: skip it and run the next one.
 3. Open **Project Settings → API** and note the **Project URL** and the **anon / publishable
    key**. Both are meant to be public; Row Level Security protects the data.
@@ -273,6 +284,40 @@ publishes it at a fixed link:
 - **Build locally:** `npm run build && npx cap sync android`, then open `android/` in Android
   Studio.
 
+### Optional: verify numbers on WhatsApp (free)
+
+Without this, numbers work as before (friends' links prove ownership when needed). With it,
+people verify a number by sending a code from their WhatsApp to Hisaab's WhatsApp number.
+Messages people send to a business, and replies within 24 hours, are free on Meta's WhatsApp
+Cloud API at the time of writing; check Meta's pricing page.
+
+1. You need a phone number that is **not** already on WhatsApp (a spare SIM works; it only has
+   to receive one setup SMS or call). It becomes Hisaab's WhatsApp number.
+2. At [developers.facebook.com](https://developers.facebook.com) create an app of type
+   **Business**, add the **WhatsApp** product, and under **WhatsApp → API Setup** add and
+   verify that number. Note the **Phone number ID**. Under **App settings → Basic** note the
+   **App secret**. For replies, create a permanent token (Business Settings → System users →
+   generate a token with `whatsapp_business_messaging`).
+3. Deploy the function (Supabase CLI, logged in and linked as in the push setup above). Pick
+   any long random string as the verify token:
+   ```bash
+   supabase secrets set WHATSAPP_VERIFY_TOKEN=... WHATSAPP_APP_SECRET=... \
+     WHATSAPP_TOKEN=... WHATSAPP_PHONE_NUMBER_ID=...
+   supabase functions deploy whatsapp-verify --no-verify-jwt
+   ```
+   (`WHATSAPP_TOKEN` and `WHATSAPP_PHONE_NUMBER_ID` are optional; with them Hisaab replies
+   "✅ verified".)
+4. Back in Meta, **WhatsApp → Configuration → Webhook**: callback URL
+   `https://<project-ref>.supabase.co/functions/v1/whatsapp-verify`, verify token = the one
+   you chose. Then subscribe to the **messages** field.
+5. In GitHub add the repository variable `VITE_WHATSAPP_NUMBER` = Hisaab's WhatsApp number
+   with country code (e.g. `919876543210`) and redeploy (the Android app picks it up on its
+   next build).
+
+Every message is checked against Meta's signature, a code only counts if it came from the
+number it was issued for, codes expire after 15 minutes, and each person gets at most 10 a
+day.
+
 ### Optional: SMS OTP login
 
 Login is free because it uses Google. Your phone number is still your identity in the app:
@@ -307,7 +352,7 @@ CI runs all of this on every push.
 
 ```
 supabase/migrations/   database schema, rules (functions) and access policies
-supabase/functions/    Edge Functions: push on new activity, weekly summary
+supabase/functions/    Edge Functions: push on new activity, weekly summary, WhatsApp verification
 src/lib/               pure logic: money, phone, split, settle, baari, payment text, nudges, i18n
 src/pages/             screens (Home, Friend passbook, Add expense, Settle up, …)
 src/components/        shared UI

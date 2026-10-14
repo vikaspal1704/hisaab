@@ -304,11 +304,14 @@ export function AddNumberSheet({
   onClose,
   personId,
   onDone,
+  fix = false,
 }: {
   open: boolean
   onClose: () => void
   personId: string
   onDone: (personId: string) => void
+  /** correct a number typed wrong, instead of adding a missing one */
+  fix?: boolean
 }) {
   const { t } = useT()
   const toast = useToast()
@@ -317,32 +320,41 @@ export function AddNumberSheet({
   const save = useLedgerMutation(async () => {
     const e164 = normalizePhone(phone)
     if (!e164) throw new InputError(t('Enter a valid mobile number'))
-    return api.setContactPhone(personId, e164)
+    return fix ? api.fixContactPhone(personId, e164) : api.setContactPhone(personId, e164)
   })
   const name = people.name(personId)
+  const current = people.byId.get(personId)?.phone
   return (
-    <Sheet open={open} onClose={onClose} title={t('Add {name}’s number', { name })}>
+    <Sheet open={open} onClose={onClose} title={fix ? t('Fix {name}’s number', { name }) : t('Add {name}’s number', { name })}>
       <form
         className="space-y-4"
         onSubmit={(e) => {
           e.preventDefault()
           save.mutate(undefined, {
             onSuccess: (id) => {
-              toast(t('Number added'))
+              toast(fix ? t('Number fixed') : t('Number added'))
               onDone(id)
             },
           })
         }}
       >
+        {fix && current ? (
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            {t('Now saved as {phone}. Your hisaab with {name} moves to the new number, and links you sent to the old one stop working.', {
+              phone: formatPhone(current),
+              name,
+            })}
+          </p>
+        ) : null}
         <Field
-          label={t('Mobile number')}
+          label={fix ? t('Correct mobile number') : t('Mobile number')}
           hint={t('If {name} is already on Hisaab (or in someone’s hisaab) with this number, everything joins up.', { name })}
         >
           <TextInput type="tel" inputMode="tel" autoComplete="tel" autoFocus placeholder="98765 43210" value={phone} onChange={(e) => setPhone(e.target.value)} />
         </Field>
         {save.error ? <p className="text-sm text-red-600">{friendlyError(save.error)}</p> : null}
         <Button block type="submit" busy={save.isPending}>
-          {t('Save number')}
+          {fix ? t('Fix number') : t('Save number')}
         </Button>
       </form>
     </Sheet>

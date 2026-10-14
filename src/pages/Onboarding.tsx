@@ -1,12 +1,14 @@
 import { useQueryClient } from '@tanstack/react-query'
-import { useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { Button, Field, TextInput } from '../components/ui'
+import { VerifyPhone } from '../components/VerifyPhone'
 import { keys } from '../hooks/queries'
 import { api } from '../lib/api'
-import { friendlyError } from '../lib/errors'
+import { friendlyError, hasErrorCode } from '../lib/errors'
 import { clearInvite, pendingInvite } from '../lib/invite'
 import { normalizePhone } from '../lib/phone'
+import { whatsappVerifyNumber } from '../lib/supabase'
 import { isLikelyUpiId } from '../lib/upi'
 import { useT } from '../lib/i18n'
 
@@ -22,9 +24,11 @@ export function OnboardingPage() {
   const [errors, setErrors] = useState<{ name?: string; phone?: string; upi?: string; form?: string }>({})
   const [busy, setBusy] = useState(false)
   const [invite] = useState(pendingInvite)
+  // A number friends already used needs proof; WhatsApp verification gives it.
+  const [needsProof, setNeedsProof] = useState<string | null>(null)
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault()
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault()
     const e164 = normalizePhone(phone)
     const next = {
       name: name.trim() ? undefined : t('Tell your friends who you are'),
@@ -39,10 +43,21 @@ export function OnboardingPage() {
       clearInvite()
       await client.invalidateQueries({ queryKey: keys.me })
     } catch (error) {
-      setErrors({ form: friendlyError(error) })
+      if (whatsappVerifyNumber && hasErrorCode(error, 'phone_needs_invite')) {
+        setNeedsProof(e164)
+        setErrors({})
+      } else {
+        setErrors({ form: friendlyError(error) })
+      }
       setBusy(false)
     }
   }
+  // Verification finishes later; submit with whatever is in the form then.
+  const latestSubmit = useRef(submit)
+  useEffect(() => {
+    latestSubmit.current = submit
+  })
+  const onVerified = useCallback(() => void latestSubmit.current(), [])
 
   return (
     <form onSubmit={submit} className="pt-safe mx-auto flex min-h-dvh max-w-lg flex-col px-6 py-8">
@@ -78,6 +93,14 @@ export function OnboardingPage() {
           <TextInput value={upi} onChange={(e) => setUpi(e.target.value)} autoCapitalize="none" autoCorrect="off" placeholder="yourname@okaxis" />
         </Field>
       </div>
+      {needsProof && normalizePhone(phone) === needsProof ? (
+        <div className="mt-6 space-y-2">
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            {t('Friends already keep hisaab with this number. Show it’s yours and all of it moves into your account.')}
+          </p>
+          <VerifyPhone phone={needsProof} onVerified={onVerified} />
+        </div>
+      ) : null}
       {errors.form ? <p className="mt-4 text-sm text-red-600">{errors.form}</p> : null}
       <div className="mt-auto space-y-2 pt-8">
         <Button type="submit" block busy={busy}>{t('Continue')}</Button>

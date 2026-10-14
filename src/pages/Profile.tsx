@@ -1,15 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { Avatar, AvatarStack } from '../components/Avatar'
 import { Page } from '../components/Page'
 import { PayMeSheet } from '../components/PayMeSheet'
+import { Sheet } from '../components/Sheet'
+import { VerifyPhone } from '../components/VerifyPhone'
 import { IconQr } from '../components/icons'
 import { useToast } from '../components/Toast'
 import { Button, ButtonLink, Card, Field, LoadingView, Row, SectionTitle, Segmented, TextInput } from '../components/ui'
 import { useHouseholds, useLedgerMutation, usePeople, useShortcuts } from '../hooks/queries'
 import { api } from '../lib/api'
 import { friendlyError, InputError } from '../lib/errors'
-import { formatPhone } from '../lib/phone'
+import { clearInvite, pendingInvite } from '../lib/invite'
+import { formatPhone, normalizePhone } from '../lib/phone'
+import { whatsappVerifyNumber } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { currentSubscription, disablePush, enablePush, pushAvailable } from '../lib/push'
 import { isLikelyUpiId } from '../lib/upi'
@@ -21,6 +25,7 @@ export function ProfilePage() {
   const households = useHouseholds()
   const me = people.me
   const [showQr, setShowQr] = useState(false)
+  const [phoneSheet, setPhoneSheet] = useState<'change' | 'verify' | null>(null)
 
   if (!me) return <Page title={t('Me')} withNav><LoadingView /></Page>
 
@@ -32,9 +37,25 @@ export function ProfilePage() {
         <Avatar id={me.id} name={me.display_name} size={64} />
         <div>
           <p className="text-xl font-semibold">{me.display_name}</p>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{me.phone ? formatPhone(me.phone) : null}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            {me.phone ? formatPhone(me.phone) : null}
+            {me.phone_verified ? <span className="ml-1.5 font-medium text-owed dark:text-owed-dark">✓ {t('Verified')}</span> : null}
+          </p>
+          <p className="mt-1 flex flex-wrap gap-x-3 text-sm font-semibold">
+            <button type="button" onClick={() => setPhoneSheet('change')} className="min-h-8 text-brand-700 dark:text-brand-400">
+              {t('Change number')}
+            </button>
+            {!me.phone_verified && whatsappVerifyNumber && me.phone ? (
+              <button type="button" onClick={() => setPhoneSheet('verify')} className="min-h-8 text-brand-700 dark:text-brand-400">
+                {t('Verify')}
+              </button>
+            ) : null}
+          </p>
         </div>
       </div>
+      {phoneSheet ? (
+        <ChangeNumberSheet current={me.phone ?? ''} verifyOnly={phoneSheet === 'verify'} onClose={() => setPhoneSheet(null)} />
+      ) : null}
       <Button variant="secondary" block className="mt-4" onClick={() => setShowQr(true)}>
         <IconQr size={18} /> {t('My UPI QR — let friends scan to pay')}
       </Button>
@@ -79,6 +100,78 @@ export function ProfilePage() {
       </div>
       </div>
     </Page>
+  )
+}
+
+/**
+ * Change my number (or just verify the current one). With WhatsApp
+ * verification set up, the new number is verified first; otherwise it's
+ * saved as typed, under the same rules as signing up.
+ */
+function ChangeNumberSheet({ current, verifyOnly, onClose }: { current: string; verifyOnly: boolean; onClose: () => void }) {
+  const { t } = useT()
+  const toast = useToast()
+  const [text, setText] = useState('')
+  const [target, setTarget] = useState<string | null>(verifyOnly ? current : null)
+  const save = useLedgerMutation((phone: string) => api.changeMyPhone(phone, pendingInvite()))
+  const { mutate } = save
+  const apply = useCallback(
+    (phone: string) =>
+      mutate(phone, {
+        onSuccess: () => {
+          clearInvite()
+          toast(verifyOnly ? t('Number verified') : t('Number changed'))
+          onClose()
+        },
+      }),
+    [mutate, toast, t, verifyOnly, onClose],
+  )
+  const next = () => {
+    const e164 = normalizePhone(text)
+    if (!e164) return toast(t('Enter a valid mobile number'))
+    if (e164 === current) return toast(t('That’s already your number.'))
+    if (whatsappVerifyNumber) setTarget(e164)
+    else apply(e164)
+  }
+  const onVerified = useCallback(() => {
+    if (target) apply(target)
+  }, [target, apply])
+
+  return (
+    <Sheet open onClose={onClose} title={verifyOnly ? t('Verify your number') : t('Change your number')}>
+      <div className="space-y-4">
+        {!verifyOnly ? (
+          <>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              {t('Your hisaab stays with you. Friends see your new number; the old one is free for its real owner.')}
+            </p>
+            <Field label={t('New mobile number')}>
+              <TextInput
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                autoFocus
+                placeholder="98765 43210"
+                value={text}
+                onChange={(e) => {
+                  setText(e.target.value)
+                  setTarget(null)
+                }}
+              />
+            </Field>
+          </>
+        ) : null}
+        {target ? (
+          <VerifyPhone key={target} phone={target} onVerified={onVerified} />
+        ) : (
+          <Button block busy={save.isPending} onClick={next}>
+            {whatsappVerifyNumber ? t('Next') : t('Change number')}
+          </Button>
+        )}
+        {save.isPending && target ? <p className="text-center text-sm text-slate-500">{t('Saving…')}</p> : null}
+        {save.error ? <p className="text-sm text-red-600">{friendlyError(save.error)}</p> : null}
+      </div>
+    </Sheet>
   )
 }
 

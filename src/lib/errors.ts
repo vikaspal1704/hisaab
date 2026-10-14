@@ -19,6 +19,9 @@ const MESSAGES: Record<string, string> = {
   invalid_km: 'Distance must be between 0.1 and 500 km.',
   invalid_items: 'Check the items: each needs a name, a price and at least one person.',
   cannot_add_self: 'That’s your own number.',
+  already_joined: 'They’ve joined Hisaab with this number, so only they can change it.',
+  number_shared: 'Other people also keep hisaab with this number, so it may be right for them. Add the correct number as a new friend instead.',
+  too_many_verifications: 'Too many codes today. Try again tomorrow.',
   invalid_phone: 'That phone number doesn’t look right.',
   invalid_name: 'Enter a name (up to 60 characters).',
   merge_conflict: 'That number belongs to someone who’s already on one of the same expenses. Fix those expenses first, or keep them as two people.',
@@ -55,6 +58,11 @@ const MESSAGES: Record<string, string> = {
 
 /** A validation problem whose message is already written for the person using the app. */
 export class InputError extends Error {}
+
+/** Whether a database error carries this code (e.g. 'phone_needs_invite'). */
+export function hasErrorCode(error: unknown, code: string): boolean {
+  return Boolean(error && typeof error === 'object' && 'message' in error && String((error as { message: unknown }).message).includes(code))
+}
 
 /** Turns a Supabase/Postgres error into something a person can act on. */
 export function friendlyError(error: unknown): string {

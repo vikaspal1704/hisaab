@@ -19,3 +19,6 @@ export const supabase = createClient(url ?? 'http://localhost:54321', key ?? 'mi
 })
 
 export const phoneOtpEnabled = import.meta.env.VITE_ENABLE_PHONE_OTP === 'true'
+
+/** Hisaab's own WhatsApp number (digits, e.g. 919876543210) for verifying numbers; unset = off. */
+export const whatsappVerifyNumber = ((import.meta.env.VITE_WHATSAPP_NUMBER as string | undefined) ?? '').replace(/\D/g, '')

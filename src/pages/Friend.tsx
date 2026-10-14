@@ -26,7 +26,7 @@ import { formatINR } from '../lib/money'
 import { formatPhone } from '../lib/phone'
 import type { LedgerRow, Reaction } from '../lib/types'
 
-type SheetName = 'settings' | 'lent' | 'forgive' | 'share' | 'nudge' | 'qr' | 'invite' | 'number' | null
+type SheetName = 'settings' | 'lent' | 'forgive' | 'share' | 'nudge' | 'qr' | 'invite' | 'number' | 'fix' | null
 
 export function FriendPage() {
   const { id = '' } = useParams()
@@ -157,6 +157,11 @@ export function FriendPage() {
               : t('You added {name} without a number — that’s fine, keep adding expenses. Add their number when you have it, or send them the invite on WhatsApp: when they join from it, they see all of it.', {
                   name: name.split(' ')[0],
                 })}
+            {person.phone && person.is_contact ? (
+              <button type="button" onClick={() => setSheet('fix')} className="mt-1 block font-semibold text-sky-800 underline-offset-2 hover:underline dark:text-sky-200">
+                {t('Wrong number? Fix it')}
+              </button>
+            ) : null}
           </p>
         ) : null}
         {household ? (
@@ -208,8 +213,9 @@ export function FriendPage() {
       {sheet === 'lent' ? <LentSheet open onClose={() => setSheet(null)} personId={id} /> : null}
       {sheet === 'forgive' ? <ForgiveSheet open onClose={() => setSheet(null)} personId={id} owed={net} /> : null}
       {sheet === 'share' ? <ShareSheet open onClose={() => setSheet(null)} personId={id} /> : null}
-      {sheet === 'number' ? (
+      {sheet === 'number' || sheet === 'fix' ? (
         <AddNumberSheet
+          fix={sheet === 'fix'}
           open
           onClose={() => setSheet(null)}
           personId={id}

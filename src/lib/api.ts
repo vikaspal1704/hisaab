@@ -59,6 +59,25 @@ export const api = {
     return rpc<string>('set_contact_phone', { p_person: personId, p_phone: phone })
   },
 
+  /** Fixes a number typed wrong for a friend who hasn't joined; returns their id after (it changes if the right number was already in Hisaab). */
+  fixContactPhone(personId: string, phone: string) {
+    return rpc<string>('fix_contact_phone', { p_person: personId, p_phone: phone })
+  },
+
+  /** Changes my own number (a number with history needs verification or a friend's link). */
+  changeMyPhone(phone: string, invite: string | null = null) {
+    return rpc<string>('change_my_phone', { p_phone: phone, ...(invite ? { p_invite: invite } : {}) })
+  },
+
+  /** A code to send from that number's WhatsApp to Hisaab's. */
+  startPhoneVerification(phone: string) {
+    return rpc<string>('start_phone_verification', { p_phone: phone })
+  },
+
+  phoneVerificationStatus(phone: string) {
+    return rpc<boolean>('phone_verification_status', { p_phone: phone })
+  },
+
   /** Adds many friends at once; returns how many were new. */
   async addContacts(rows: { phone: string; name: string }[]): Promise<number> {
     let added = 0

@@ -1,6 +1,7 @@
 # Builds the app and publishes it to GitHub Pages (free).
 # Needs repository variables VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (optional:
-# VITE_GOOGLE_CLIENT_ID for "Connect Google Contacts", VITE_VAPID_PUBLIC_KEY for push)
+# VITE_GOOGLE_CLIENT_ID for "Connect Google Contacts", VITE_VAPID_PUBLIC_KEY for push,
+# VITE_WHATSAPP_NUMBER for verifying numbers on WhatsApp)
 # (Settings -> Secrets and variables -> Actions -> Variables).
 name: Deploy to GitHub Pages
 
@@ -34,6 +35,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
           VITE_ENABLE_PHONE_OTP: ${{ vars.VITE_ENABLE_PHONE_OTP }}
+          VITE_WHATSAPP_NUMBER: ${{ vars.VITE_WHATSAPP_NUMBER }}
           VITE_VAPID_PUBLIC_KEY: ${{ vars.VITE_VAPID_PUBLIC_KEY }}
           VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
       - uses: actions/upload-pages-artifact@v3

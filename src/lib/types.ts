@@ -18,6 +18,8 @@ export interface Person {
   is_me: boolean
   /** a number-less friend I added, so I may give them a number */
   can_set_phone?: boolean
+  /** their number was verified (OTP or WhatsApp) */
+  phone_verified?: boolean
 }
 
 export interface Balance {
