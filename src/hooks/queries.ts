@@ -24,6 +24,7 @@ export const keys = {
   recurring: (id: string) => ['recurring', id] as const,
   carpoolTrips: (id: string) => ['carpool-trips', id] as const,
   carpoolSummary: (id: string) => ['carpool-summary', id] as const,
+  carpoolDistances: (id: string) => ['carpool-distances', id] as const,
   reactions: (ids: string[]) => ['reactions', ...ids] as const,
 }
 

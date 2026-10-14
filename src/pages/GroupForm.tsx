@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { Page } from '../components/Page'
@@ -6,10 +7,10 @@ import { useToast } from '../components/Toast'
 import { IconTrash } from '../components/icons'
 import { Sheet } from '../components/Sheet'
 import { Button, Card, ErrorView, Field, LoadingView, SectionTitle, TextInput } from '../components/ui'
-import { useGroups, useLedgerMutation, usePeople } from '../hooks/queries'
+import { keys, useGroups, useLedgerMutation, usePeople } from '../hooks/queries'
 import { api } from '../lib/api'
 import { friendlyError, InputError } from '../lib/errors'
-import { parseRupees, toRupeeInput } from '../lib/money'
+import { formatINR, parseRupees, toRupeeInput } from '../lib/money'
 import { useT } from '../lib/i18n'
 import type { CarpoolStyle } from '../lib/carpool'
 import type { Group, GroupKind } from '../lib/types'
@@ -19,11 +20,17 @@ const KINDS: { value: GroupKind; label: string; hint: string; emoji: string }[] 
   { value: 'trip', label: 'Trip', hint: 'Exact splits, and an optional kitty everyone chips into.', emoji: '✈️' },
   { value: 'home', label: 'Flat / home', hint: 'Exact splits, plus monthly bills like rent and WiFi.', emoji: '🏠' },
   { value: 'office', label: 'Office crew', hint: 'Daily chai and snacks in one tap. Take turns; small differences count as even.', emoji: '☕' },
-  { value: 'carpool', label: 'Car pool', hint: 'Log morning and evening rides in two taps: a fare to the driver, split the fuel, or just take turns.', emoji: '🚗' },
+  { value: 'carpool', label: 'Car pool', hint: 'Log morning and evening rides in two taps: a fare to the driver, pay by distance, split the fuel, or just take turns.', emoji: '🚗' },
 ]
 
 const CARPOOL_STYLES: { value: CarpoolStyle; label: string; hint: string; amountLabel?: string }[] = [
   { value: 'fare', label: 'Riders pay a fare', hint: 'Each rider pays the driver a fixed amount per trip.', amountLabel: 'Fare per rider, per trip (₹)' },
+  {
+    value: 'distance',
+    label: 'Riders pay by distance',
+    hint: 'Each rider pays the driver for the km they ride, at a rate per km. Someone picked up halfway pays less.',
+    amountLabel: 'Rate per km (₹)',
+  },
   { value: 'split', label: 'Split the cost', hint: 'Whoever drives pays fuel/toll; it’s shared by everyone in the car.', amountLabel: 'Usual cost of one trip (₹)' },
   { value: 'turns', label: 'Take turns driving', hint: 'No money. Hisaab counts who drove and who rode, and says whose turn it is.' },
 ]
@@ -51,13 +58,37 @@ function GroupForm({ existing }: { existing: Group | null }) {
   const [carpoolStyle, setCarpoolStyle] = useState<CarpoolStyle>(existing?.carpoolStyle ?? 'split')
   const [carpoolAmountText, setCarpoolAmountText] = useState(existing?.carpoolAmount ? toRupeeInput(existing.carpoolAmount) : '')
   const [selected, setSelected] = useState<Set<string>>(new Set(existing?.memberIds ?? []))
+  const people = usePeople()
+  const distances = useQuery({
+    queryKey: keys.carpoolDistances(existing?.id ?? ''),
+    queryFn: () => api.carpoolDistances(existing!.id),
+    enabled: Boolean(existing),
+  })
+  // Only the distances someone edited here; the rest come from the database.
+  const [kmText, setKmText] = useState<Record<string, string>>({})
+  const kmOf = (id: string) => kmText[id] ?? (distances.data?.get(id)?.toString() ?? '')
+  const carMembers = [...new Set([...(existing ? existing.memberIds : people.me ? [people.me.id] : []), ...selected])]
   const [error, setError] = useState<string | null>(null)
   const carpoolChanged = (group: Group | null) =>
     kind === 'carpool' && (group?.carpoolStyle !== carpoolStyle || group?.carpoolAmount !== (parseRupees(carpoolAmountText) ?? null))
   const save = useLedgerMutation(async () => {
     const carpoolAmount = parseRupees(carpoolAmountText)
     if (kind === 'carpool' && carpoolStyle !== 'turns' && !carpoolAmount) {
-      throw new InputError(t(carpoolStyle === 'fare' ? 'Enter the fare per rider' : 'Enter the usual cost of a trip'))
+      throw new InputError(
+        t(carpoolStyle === 'fare' ? 'Enter the fare per rider' : carpoolStyle === 'distance' ? 'Enter the rate per km' : 'Enter the usual cost of a trip'),
+      )
+    }
+    const kmChanges = kind === 'carpool' && carpoolStyle === 'distance'
+      ? Object.entries(kmText).map(([personId, text]) => {
+          const km = text.trim() ? Number(text.replace(',', '.')) : null
+          if (km !== null && !(km > 0 && km <= 500)) throw new InputError(t('Distance must be between 0.1 and 500 km'))
+          return { personId, km }
+        })
+      : []
+    const saveDistances = async (groupId: string) => {
+      for (const { personId, km } of kmChanges) {
+        if (km !== null || distances.data?.has(personId)) await api.setCarpoolDistance(groupId, personId, km)
+      }
     }
     if (existing) {
       const added = [...selected].filter((m) => !existing.memberIds.includes(m))
@@ -65,11 +96,13 @@ function GroupForm({ existing }: { existing: Group | null }) {
       const tol = usesTolerance ? parseRupees(toleranceText) ?? 0 : 0
       if (kind !== existing.kind || tol !== existing.tolerance) await api.setGroupPrefs(existing.id, kind, tol, existing.kittyHolder)
       if (carpoolChanged(existing)) await api.setCarpoolPrefs(existing.id, carpoolStyle, carpoolStyle === 'turns' ? null : carpoolAmount)
+      await saveDistances(existing.id)
       return existing.id
     }
     const id = await api.createGroup(name.trim(), emoji, [...selected])
     if (kind !== 'friends') await api.setGroupPrefs(id, kind, usesTolerance ? 10000 : 0, null)
     if (kind === 'carpool') await api.setCarpoolPrefs(id, carpoolStyle, carpoolStyle === 'turns' ? null : carpoolAmount)
+    await saveDistances(id)
     return id
   })
 
@@ -146,8 +179,42 @@ function GroupForm({ existing }: { existing: Group | null }) {
             </div>
             {CARPOOL_STYLES.find((s) => s.value === carpoolStyle)?.amountLabel ? (
               <Field label={t(CARPOOL_STYLES.find((s) => s.value === carpoolStyle)!.amountLabel!)} hint={t('You can change it for any single trip.')}>
-                <TextInput inputMode="decimal" value={carpoolAmountText} onChange={(e) => setCarpoolAmountText(e.target.value)} placeholder={carpoolStyle === 'fare' ? '80' : '300'} />
+                <TextInput
+                  inputMode="decimal"
+                  value={carpoolAmountText}
+                  onChange={(e) => setCarpoolAmountText(e.target.value)}
+                  placeholder={carpoolStyle === 'fare' ? '80' : carpoolStyle === 'distance' ? '8' : '300'}
+                />
               </Field>
+            ) : null}
+            {carpoolStyle === 'distance' ? (
+              <div className="space-y-2 pt-1">
+                <p className="text-sm font-medium">{t('How far each person rides (km, one way)')}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {t('The driver pays nothing for that trip. Whoever drives, the others pay for their own km.')}
+                </p>
+                {carMembers.length < 2 ? (
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{t('Pick the members below, then fill in their km.')}</p>
+                ) : null}
+                {carMembers.map((id) => {
+                  const rate = parseRupees(carpoolAmountText)
+                  const km = Number(kmOf(id).replace(',', '.'))
+                  return (
+                    <label key={id} className="flex min-h-11 items-center gap-3">
+                      <span className="min-w-0 flex-1 truncate text-sm">{people.name(id)}</span>
+                      {rate && km > 0 ? <span className="text-xs text-slate-500 tabular-nums">{t('{amount} a trip', { amount: formatINR(Math.round(km * rate)) })}</span> : null}
+                      <input
+                        inputMode="decimal"
+                        aria-label={t('Km for {name}', { name: people.name(id) })}
+                        value={kmOf(id)}
+                        onChange={(e) => setKmText((m) => ({ ...m, [id]: e.target.value.replace(/[^\d.,]/g, '') }))}
+                        placeholder="km"
+                        className="h-10 w-20 rounded-lg bg-slate-100 px-2 text-right tabular-nums outline-none focus:ring-2 focus:ring-brand-600 dark:bg-slate-800"
+                      />
+                    </label>
+                  )
+                })}
+              </div>
             ) : null}
           </div>
         ) : null}

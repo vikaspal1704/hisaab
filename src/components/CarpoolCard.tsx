@@ -5,7 +5,7 @@ import { useToast } from './Toast'
 import { Button, Card, SectionTitle } from './ui'
 import { keys, useLedgerMutation, usePeople } from '../hooks/queries'
 import { api } from '../lib/api'
-import { nextDriver, tripDefaults, tripTotal, type CarpoolTrip, type Direction, type SeatCount } from '../lib/carpool'
+import { distanceCharges, nextDriver, tripDefaults, tripTotal, type CarpoolTrip, type Direction, type Distances, type SeatCount } from '../lib/carpool'
 import { friendlyError } from '../lib/errors'
 import { formatDay, todayISO } from '../lib/format'
 import { useT } from '../lib/i18n'
@@ -31,6 +31,12 @@ export function CarpoolCard({ group }: { group: Group }) {
   const trips = useQuery({ queryKey: keys.carpoolTrips(group.id), queryFn: () => api.carpoolTrips(group.id, daysAgo(45)) })
   const summary = useQuery({ queryKey: keys.carpoolSummary(group.id), queryFn: () => api.carpoolSummary(group.id) })
   const style = group.carpoolStyle
+  const distances = useQuery({
+    queryKey: keys.carpoolDistances(group.id),
+    queryFn: () => api.carpoolDistances(group.id),
+    enabled: style === 'distance',
+  })
+  const km: Distances = distances.data ?? new Map()
 
   if (!style) {
     return (
@@ -47,7 +53,12 @@ export function CarpoolCard({ group }: { group: Group }) {
   const recent = trips.data ?? []
   const counts = summary.data ?? []
   const suggested = nextDriver(group.memberIds, counts, style, recent[0]?.driver_id ?? null)
-  const styleLabel = { fare: t('fare {amount} per rider', { amount: formatINR(group.carpoolAmount ?? 0) }), split: t('split the cost'), turns: t('take turns') }[style]
+  const styleLabel = {
+    fare: t('fare {amount} per rider', { amount: formatINR(group.carpoolAmount ?? 0) }),
+    distance: t('{rate} per km · riders pay for their own km', { rate: formatINR(group.carpoolAmount ?? 0) }),
+    split: t('split the cost'),
+    turns: t('take turns'),
+  }[style]
 
   return (
     <>
@@ -66,16 +77,16 @@ export function CarpoolCard({ group }: { group: Group }) {
             className="h-9 rounded-lg bg-slate-100 px-2 text-sm dark:bg-slate-800"
           />
         </div>
-        {style !== 'fare' && counts.some((c) => c.drives + c.rides > 0) ? (
+        {style !== 'fare' && style !== 'distance' && counts.some((c) => c.drives + c.rides > 0) ? (
           <p className="rounded-xl bg-amber-50 p-2.5 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
             ⚖️ {suggested === people.me?.id ? t('Your turn to drive next') : t('{name}’s turn to drive next', { name: people.name(suggested) })}
           </p>
         ) : null}
-        {trips.isPending || summary.isPending ? null : (
+        {trips.isPending || summary.isPending || (style === 'distance' && distances.isPending) ? null : (
           DIRECTIONS.map((d) => {
             const logged = recent.find((x) => x.trip_date === date && x.direction === d.value)
             return logged ? (
-              <LoggedTrip key={d.value} trip={logged} label={`${d.icon} ${t(d.label)}`} group={group} />
+              <LoggedTrip key={d.value} trip={logged} label={`${d.icon} ${t(d.label)}`} group={group} km={km} />
             ) : (
               <TripForm
                 // Remount when the day or the history changes so the defaults follow.
@@ -86,6 +97,7 @@ export function CarpoolCard({ group }: { group: Group }) {
                 date={date}
                 recent={recent}
                 counts={counts}
+                km={km}
               />
             )
           })
@@ -96,14 +108,14 @@ export function CarpoolCard({ group }: { group: Group }) {
   )
 }
 
-function LoggedTrip({ trip, label, group }: { trip: CarpoolTrip; label: string; group: Group }) {
+function LoggedTrip({ trip, label, group, km }: { trip: CarpoolTrip; label: string; group: Group; km: Distances }) {
   const { t } = useT()
   const toast = useToast()
   const people = usePeople()
   const undo = useLedgerMutation(() => api.deleteCarpoolTrip(trip.id))
   const me = people.me?.id
   const inCar = me === trip.driver_id || (me ? trip.riders.includes(me) : false)
-  const total = tripTotal(group.carpoolStyle ?? 'turns', trip.amount, trip.riders.length)
+  const total = trip.total ?? tripTotal(group.carpoolStyle ?? 'turns', trip.amount, trip.riders, km)
   return (
     <div className="flex items-start gap-3 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-800/60">
       <span className="flex-1">
@@ -136,6 +148,7 @@ function TripForm({
   date,
   recent,
   counts,
+  km,
 }: {
   group: Group
   direction: Direction
@@ -143,6 +156,7 @@ function TripForm({
   date: string
   recent: CarpoolTrip[]
   counts: SeatCount[]
+  km: Distances
 }) {
   const { t } = useT()
   const toast = useToast()
@@ -156,7 +170,8 @@ function TripForm({
   const me = people.me?.id ?? ''
   const inCar = driver === me || riders.includes(me)
   const ridersInCar = riders.filter((r) => r !== driver)
-  const total = tripTotal(style, amount, ridersInCar.length)
+  const total = tripTotal(style, amount, ridersInCar, km)
+  const byDistance = style === 'distance' && amount ? distanceCharges(ridersInCar, km, amount) : null
 
   const save = useLedgerMutation(() => api.saveCarpoolTrip({ groupId: group.id, date, direction, driver, riders: ridersInCar, amount }))
   const toggle = (id: string) => setRiders((list) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]))
@@ -166,8 +181,10 @@ function TripForm({
       : !inCar
         ? t('Only someone in the car can log it')
         : style !== 'turns' && !amount
-          ? t(style === 'fare' ? 'Enter the fare per rider' : 'Enter the trip cost')
-          : null
+          ? t(style === 'fare' ? 'Enter the fare per rider' : style === 'distance' ? 'Enter the rate per km' : 'Enter the trip cost')
+          : byDistance && byDistance.missing.length > 0
+            ? t('Add km for {names}', { names: byDistance.missing.map((id) => people.name(id)).join(', ') })
+            : null
 
   const chip = (on: boolean) =>
     `min-h-9 rounded-full px-3 text-sm font-medium ring-1 ${on ? 'bg-brand-700 text-white ring-brand-700' : 'bg-white text-slate-600 ring-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700'}`
@@ -205,10 +222,10 @@ function TripForm({
       <div className="flex items-center gap-2">
         {style !== 'turns' ? (
           <label className="flex items-center gap-1.5 text-sm text-slate-500">
-            {style === 'fare' ? t('Fare ₹') : t('Cost ₹')}
+            {style === 'fare' ? t('Fare ₹') : style === 'distance' ? t('₹ per km') : t('Cost ₹')}
             <input
               inputMode="decimal"
-              aria-label={t(style === 'fare' ? '{label} fare per rider' : '{label} trip cost', { label })}
+              aria-label={t(style === 'fare' ? '{label} fare per rider' : style === 'distance' ? '{label} rate per km' : '{label} trip cost', { label })}
               value={amountText}
               onChange={(e) => setAmountText(e.target.value.replace(/[^\d.,]/g, ''))}
               className="h-9 w-20 rounded-lg bg-slate-100 px-2 text-right text-slate-900 tabular-nums dark:bg-slate-800 dark:text-slate-100"
@@ -224,6 +241,16 @@ function TripForm({
           {problem ?? (total ? t('Log ride · {amount}', { amount: formatINR(total) }) : t('Log ride'))}
         </Button>
       </div>
+      {byDistance && byDistance.charges.size > 0 ? (
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          {[...byDistance.charges].map(([id, owed]) => `${people.name(id)} ${km.get(id)} km · ${formatINR(owed)}`).join('  ·  ')}
+        </p>
+      ) : null}
+      {byDistance && byDistance.missing.length > 0 ? (
+        <Link to={`/g/${group.id}/edit`} className="block text-sm font-semibold text-brand-700 dark:text-brand-400">
+          {t('Set distances')} →
+        </Link>
+      ) : null}
       {save.error ? <p className="text-sm text-red-600">{friendlyError(save.error)}</p> : null}
     </div>
   )

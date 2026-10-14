@@ -1,4 +1,4 @@
-import type { CarpoolStyle, CarpoolTrip, Direction, SeatCount } from './carpool'
+import type { CarpoolStyle, CarpoolTrip, Direction, Distances, SeatCount } from './carpool'
 import type { StoredItems } from './itemSplit'
 import type { Paise } from './money'
 import type { Allocation } from './settle'
@@ -253,13 +253,35 @@ export const api = {
   async carpoolTrips(groupId: string, since: string): Promise<CarpoolTrip[]> {
     const { data, error } = await supabase
       .from('carpool_trips')
-      .select('id, trip_date, direction, driver_id, riders, amount, entry_id')
+      // "*" so a database without the per-trip total yet still loads.
+      .select('*')
       .eq('group_id', groupId)
       .gte('trip_date', since)
       .order('trip_date', { ascending: false })
       .order('direction', { ascending: false })
     if (error) throw error
-    return data.map((t) => ({ ...t, amount: t.amount == null ? null : num(t.amount) })) as CarpoolTrip[]
+    return data.map((t) => ({
+      id: t.id,
+      trip_date: t.trip_date,
+      direction: t.direction,
+      driver_id: t.driver_id,
+      riders: t.riders,
+      entry_id: t.entry_id,
+      amount: t.amount == null ? null : num(t.amount),
+      total: t.total == null ? null : num(t.total),
+    })) as CarpoolTrip[]
+  },
+
+  /** How far each member rides, one way (by-distance car pools). */
+  async carpoolDistances(groupId: string): Promise<Distances> {
+    const { data, error } = await supabase.from('carpool_distances').select('person_id, km').eq('group_id', groupId)
+    if (error) throw error
+    return new Map(data.map((d) => [d.person_id as string, Number(d.km)]))
+  },
+
+  /** Sets (or with null, clears) how far someone rides, one way. */
+  setCarpoolDistance(groupId: string, personId: string, km: number | null) {
+    return rpc<void>('set_carpool_distance', { p_group: groupId, p_person: personId, p_km: km })
   },
 
   async carpoolSummary(groupId: string): Promise<SeatCount[]> {

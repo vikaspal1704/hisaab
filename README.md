@@ -111,8 +111,10 @@ another app, and asking for money back is awkward.
   is pays. Small differences count as even.
 - **Car pool.** A group type for shared rides. Log the morning and evening trips separately
   in two taps: pick the driver, tap who rode. Each group chooses how it works: **riders pay
-  a fare** to the driver, **split the cost** of each trip among everyone in the car, or **take
-  turns** with no money at all. Hisaab counts who drove and who rode, says whose turn it is,
+  a fare** to the driver, **riders pay by distance** (a rate per km and each person's
+  one-way km, so someone picked up halfway pays less; the driver pays nothing for that trip),
+  **split the cost** of each trip among everyone in the car, or **take turns** with no money
+  at all. Hisaab counts who drove and who rode, says whose turn it is,
   and offers the same car back for the evening. Fares and costs can be changed for any
   single trip, and a mistaken trip can be undone.
 - **Repeating expenses.** Monthly (rent, WiFi, cook, Netflix), every weekday (a snacks box) or
@@ -163,7 +165,8 @@ You need a GitHub account, a Supabase account (free) and a Google Cloud account 
    `supabase/migrations/20261017000000_carpool.sql`, then
    `supabase/migrations/20261018000000_delete_group.sql`, then
    `supabase/migrations/20261019000000_contact_matching.sql`, then
-   `supabase/migrations/20261020000000_no_phone_and_on_behalf.sql`, in that order. If a file says
+   `supabase/migrations/20261020000000_no_phone_and_on_behalf.sql`, then
+   `supabase/migrations/20261021000000_carpool_distance.sql`, in that order. If a file says
    something "already exists", it was run before: skip it and run the next one.
 3. Open **Project Settings → API** and note the **Project URL** and the **anon / publishable
    key**. Both are meant to be public; Row Level Security protects the data.

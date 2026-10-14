@@ -1,6 +1,6 @@
 import type { Paise } from './money'
 
-export type CarpoolStyle = 'fare' | 'split' | 'turns'
+export type CarpoolStyle = 'fare' | 'split' | 'turns' | 'distance'
 export type Direction = 'am' | 'pm'
 
 export interface CarpoolTrip {
@@ -9,8 +9,10 @@ export interface CarpoolTrip {
   direction: Direction
   driver_id: string
   riders: string[]
-  /** fare per rider (fare) or the trip's cost (split); null for turns */
+  /** fare per rider (fare), the trip's cost (split) or the rate per km (distance); null for turns */
   amount: Paise | null
+  /** what the trip cost in total, when the database recorded it (distance trips) */
+  total?: Paise | null
   entry_id: string | null
 }
 
@@ -28,7 +30,8 @@ export interface SeatCount {
  * the rides they've taken (fewest drives breaks ties, then not the last driver).
  */
 export function nextDriver(members: string[], counts: SeatCount[], style: CarpoolStyle, lastDriver: string | null): string {
-  if (style === 'fare') return lastDriver && members.includes(lastDriver) ? lastDriver : members[0]
+  // One car owner usually drives when riders pay them: keep the last driver.
+  if (style === 'fare' || style === 'distance') return lastDriver && members.includes(lastDriver) ? lastDriver : members[0]
   const by = new Map(counts.map((c) => [c.person_id, c]))
   return [...members].sort((a, b) => {
     const ca = by.get(a)
@@ -67,8 +70,28 @@ export function tripDefaults(args: {
   return { driver, riders: crew.filter((id) => id !== driver && members.includes(id)) }
 }
 
-/** What a trip costs in total: fare × riders, the trip cost, or nothing for turns. */
-export function tripTotal(style: CarpoolStyle, amount: Paise | null, riders: number): Paise {
+/** How far each member rides, one way, by person id. */
+export type Distances = ReadonlyMap<string, number>
+
+/**
+ * What each rider owes the driver on a by-distance trip: their km × the rate
+ * per km, to the paisa (same rounding as the database). Riders without a
+ * distance are listed in `missing`.
+ */
+export function distanceCharges(riders: string[], km: Distances, ratePerKm: Paise): { charges: Map<string, Paise>; missing: string[] } {
+  const charges = new Map<string, Paise>()
+  const missing: string[] = []
+  for (const id of riders) {
+    const d = km.get(id)
+    if (d === undefined) missing.push(id)
+    else charges.set(id, Math.round(d * ratePerKm))
+  }
+  return { charges, missing }
+}
+
+/** What a trip costs in total: fare × riders, the trip cost, km × rate per rider, or nothing for turns. */
+export function tripTotal(style: CarpoolStyle, amount: Paise | null, riders: string[], km: Distances = new Map()): Paise {
   if (style === 'turns' || !amount) return 0
-  return style === 'fare' ? amount * riders : amount
+  if (style === 'distance') return [...distanceCharges(riders, km, amount).charges.values()].reduce((a, b) => a + b, 0)
+  return style === 'fare' ? amount * riders.length : amount
 }

@@ -12,7 +12,7 @@ afterAll(async () => {
   await db?.close()
 })
 
-async function carpool(style: 'fare' | 'split' | 'turns', amount: number | null) {
+async function carpool(style: 'fare' | 'split' | 'turns' | 'distance', amount: number | null) {
   const users: TestUser[] = []
   for (const name of ['Driver', 'Rider1', 'Rider2', 'Rider3']) users.push(await db.signUp(name, nextPhone()))
   const [d, ...others] = users
@@ -41,6 +41,39 @@ const balances = async (user: TestUser, group: string) =>
   )
 
 describe('car pool', () => {
+  it('distance: each rider pays the driver for their own km at the rate', async () => {
+    // Sonika drives; Vikas rides 20 km, Garvit is picked up 14 km from the office. ₹8/km.
+    const { group, users } = await carpool('distance', 800)
+    const [sonika, vikas, garvit, other] = users
+    const km = (by: TestUser, who: TestUser, value: number | null) =>
+      db.as(by, 'select public.set_carpool_distance($1, $2, $3)', [group, who.personId, value])
+    await km(sonika, sonika, 20)
+    await km(sonika, vikas, 20)
+    await expect(trip(sonika, group, sonika, [vikas, garvit])).rejects.toThrow(/carpool_km_needed/)
+    await km(vikas, garvit, 14) // any member can set anyone's distance
+    await expect(km(vikas, garvit, 0)).rejects.toThrow(/invalid_km/)
+    await expect(km(vikas, garvit, 501)).rejects.toThrow(/invalid_km/)
+
+    const [{ id }] = await trip(sonika, group, sonika, [vikas, garvit])
+    await trip(garvit, group, sonika, [vikas, garvit], 'pm')
+    const b = await balances(sonika, group)
+    expect(b).toEqual({ [sonika.personId]: 54400, [vikas.personId]: -32000, [garvit.personId]: -22400, [other.personId]: 0 })
+    const [row] = await db.as<{ amount: string; total: string }>(sonika, 'select amount, total from public.carpool_trips where id = $1', [id])
+    expect(row).toEqual({ amount: '800', total: '27200' })
+
+    // When Vikas drives, Sonika pays for her 20 km; half-km distances round to the paisa.
+    await km(garvit, garvit, 13.5)
+    await trip(vikas, group, vikas, [sonika, garvit], 'am', '2026-10-13', 750) // ₹7.50/km just this trip
+    const after = await balances(sonika, group)
+    expect(after[sonika.personId]).toBe(54400 - 15000)
+    expect(after[garvit.personId]).toBe(-22400 - 10125)
+
+    await km(sonika, garvit, null)
+    expect(await db.as(sonika, 'select person_id from public.carpool_distances where group_id = $1 and person_id = $2', [group, garvit.personId])).toEqual([])
+    await expect(km(other, users[0], 10)).resolves.toBeTruthy()
+  })
+
+
   it('fare: each rider owes the driver the fare, and the driver owes nothing', async () => {
     const { group, users } = await carpool('fare', 8000)
     const [d, r1, r2, r3] = users

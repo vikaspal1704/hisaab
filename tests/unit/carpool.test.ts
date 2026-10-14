@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { nextDriver, tripDefaults, tripTotal, type CarpoolTrip, type SeatCount } from '../../src/lib/carpool'
+import { distanceCharges, nextDriver, tripDefaults, tripTotal, type CarpoolTrip, type SeatCount } from '../../src/lib/carpool'
 
 const members = ['a', 'b', 'c']
 const count = (person_id: string, drives: number, rides: number, seats: number): SeatCount => ({ person_id, drives, rides, seats })
@@ -48,8 +48,22 @@ describe('tripDefaults', () => {
 
 describe('tripTotal', () => {
   it('is fare × riders, the trip cost, or nothing', () => {
-    expect(tripTotal('fare', 8000, 3)).toBe(24000)
-    expect(tripTotal('split', 30000, 3)).toBe(30000)
-    expect(tripTotal('turns', null, 3)).toBe(0)
+    expect(tripTotal('fare', 8000, ['a', 'b', 'c'])).toBe(24000)
+    expect(tripTotal('split', 30000, ['a', 'b', 'c'])).toBe(30000)
+    expect(tripTotal('turns', null, ['a', 'b', 'c'])).toBe(0)
+  })
+
+  it('by distance: each rider’s km × the rate per km', () => {
+    const km = new Map([['vikas', 20], ['garvit', 14]])
+    expect(tripTotal('distance', 800, ['vikas', 'garvit'], km)).toBe(16000 + 11200)
+  })
+})
+
+describe('distanceCharges', () => {
+  it('charges each rider for their own km, to the paisa, and lists who has no distance', () => {
+    const km = new Map([['vikas', 20], ['garvit', 13.5]])
+    const { charges, missing } = distanceCharges(['vikas', 'garvit', 'new'], km, 750)
+    expect(Object.fromEntries(charges)).toEqual({ vikas: 15000, garvit: 10125 })
+    expect(missing).toEqual(['new'])
   })
 })
