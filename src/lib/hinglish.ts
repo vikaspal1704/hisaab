@@ -766,6 +766,7 @@ export const HINGLISH: Record<string, string> = {
   'Good afternoon, {name}': 'Namaste, {name}',
   'Good evening, {name}': 'Good evening, {name}',
   'Keep the books with your friends.': 'Doston ke saath hisaab rakho.',
+  'Made by': 'Banane wale',
   'No more splitting every bill — take turns paying, and Hisaab keeps it fair.': 'Har bill baantna band — baari baari pay karo, Hisaab sab barabar rakhega.',
   'Sign in': 'Sign in karo',
   'Free, no ads. Your friends don’t need the app to start.': 'Free, koi ads nahi. Doston ko shuru karne ke liye app nahi chahiye.',
