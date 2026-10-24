@@ -105,6 +105,12 @@ export function LoginPage() {
           <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
             {t('Friends find you by your phone number, which you add next.')}
           </p>
+          <p className="mt-3 text-center text-xs text-slate-500 dark:text-slate-400">
+            {t('Made by')}{' '}
+            <a href="https://vikaspal.is-a.dev/" className="font-medium underline underline-offset-2 hover:text-slate-700 dark:hover:text-slate-200">
+              Vikas Pal
+            </a>
+          </p>
         </div>
       </section>
     </div>
